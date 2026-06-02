@@ -1,0 +1,1393 @@
+<!DOCTYPE html>
+<html lang="pt-BR">
+<head>
+<meta charset="UTF-8">
+<meta name="viewport" content="width=device-width, initial-scale=1.0">
+<title>WhatsApp Bot Manager</title>
+<link rel="preconnect" href="https://fonts.googleapis.com">
+<link href="https://fonts.googleapis.com/css2?family=Syne:wght@400;600;700;800&family=DM+Sans:wght@300;400;500&display=swap" rel="stylesheet">
+<style>
+  :root {
+    --green: #25D366;
+    --green-dark: #128C7E;
+    --green-light: #DCF8C6;
+    --bg: #0d1117;
+    --surface: #161b22;
+    --surface2: #1c2330;
+    --border: #30363d;
+    --text: #e6edf3;
+    --text-muted: #8b949e;
+    --accent: #25D366;
+    --danger: #f85149;
+    --warning: #d29922;
+    --radius: 12px;
+  }
+
+  * { box-sizing: border-box; margin: 0; padding: 0; }
+
+  body {
+    font-family: 'DM Sans', sans-serif;
+    background: var(--bg);
+    color: var(--text);
+    min-height: 100vh;
+    display: flex;
+    flex-direction: column;
+  }
+
+  /* ── Header ── */
+  header {
+    background: var(--surface);
+    border-bottom: 1px solid var(--border);
+    padding: 0 24px;
+    display: flex;
+    align-items: center;
+    justify-content: space-between;
+    height: 64px;
+    position: sticky;
+    top: 0;
+    z-index: 100;
+  }
+
+  .header-brand {
+    display: flex;
+    align-items: center;
+    gap: 12px;
+  }
+
+  .header-brand .logo-icon {
+    width: 36px; height: 36px;
+    background: var(--green);
+    border-radius: 10px;
+    display: flex; align-items: center; justify-content: center;
+    font-size: 20px;
+  }
+
+  .header-brand h1 {
+    font-family: 'Syne', sans-serif;
+    font-size: 18px;
+    font-weight: 700;
+    letter-spacing: -0.3px;
+    color: var(--text);
+  }
+
+  .bot-status-pill {
+    display: flex;
+    align-items: center;
+    gap: 8px;
+    padding: 6px 14px;
+    border-radius: 999px;
+    border: 1px solid var(--border);
+    font-size: 13px;
+    font-weight: 500;
+    background: var(--surface2);
+    transition: all 0.3s;
+  }
+
+  .status-dot {
+    width: 8px; height: 8px;
+    border-radius: 50%;
+    background: var(--text-muted);
+    transition: all 0.3s;
+  }
+
+  .status-dot.connected { background: var(--green); box-shadow: 0 0 8px var(--green); animation: pulse 2s infinite; }
+  .status-dot.connecting { background: var(--warning); animation: pulse 1s infinite; }
+
+  @keyframes pulse {
+    0%, 100% { opacity: 1; }
+    50% { opacity: 0.4; }
+  }
+
+  /* ── Tabs ── */
+  .tabs-nav {
+    display: flex;
+    background: var(--surface);
+    border-bottom: 1px solid var(--border);
+    padding: 0 24px;
+    gap: 4px;
+  }
+
+  .tab-btn {
+    padding: 14px 20px;
+    background: none;
+    border: none;
+    color: var(--text-muted);
+    font-family: 'DM Sans', sans-serif;
+    font-size: 14px;
+    font-weight: 500;
+    cursor: pointer;
+    border-bottom: 2px solid transparent;
+    transition: all 0.2s;
+    display: flex;
+    align-items: center;
+    gap: 8px;
+    margin-bottom: -1px;
+  }
+
+  .tab-btn:hover { color: var(--text); }
+
+  .tab-btn.active {
+    color: var(--green);
+    border-bottom-color: var(--green);
+  }
+
+  /* ── Content ── */
+  .tab-content { display: none; flex: 1; }
+  .tab-content.active { display: flex; }
+
+  /* ── Tab 1: Conexão ── */
+  #tab-connection {
+    flex-direction: column;
+    align-items: center;
+    justify-content: center;
+    padding: 40px 24px;
+    gap: 32px;
+  }
+
+  .business-card {
+    background: var(--surface);
+    border: 1px solid var(--border);
+    border-radius: 20px;
+    padding: 32px;
+    text-align: center;
+    max-width: 420px;
+    width: 100%;
+  }
+
+  .business-logo-wrap {
+    width: 80px; height: 80px;
+    border-radius: 20px;
+    background: linear-gradient(135deg, var(--green-dark), var(--green));
+    display: flex;
+    align-items: center;
+    justify-content: center;
+    font-size: 38px;
+    margin: 0 auto 16px;
+    position: relative;
+    overflow: hidden;
+    cursor: pointer;
+    transition: transform 0.2s;
+  }
+
+  .business-logo-wrap:hover { transform: scale(1.05); }
+
+  .business-logo-wrap img {
+    width: 100%; height: 100%;
+    object-fit: cover;
+    border-radius: 20px;
+  }
+
+  .logo-overlay {
+    position: absolute; inset: 0;
+    background: rgba(0,0,0,0.5);
+    display: none;
+    align-items: center;
+    justify-content: center;
+    border-radius: 20px;
+    font-size: 20px;
+  }
+
+  .business-logo-wrap:hover .logo-overlay { display: flex; }
+
+  .business-name-display {
+    font-family: 'Syne', sans-serif;
+    font-size: 22px;
+    font-weight: 800;
+    margin-bottom: 4px;
+  }
+
+  .business-subtitle {
+    color: var(--text-muted);
+    font-size: 13px;
+  }
+
+  /* QR Panel */
+  .qr-panel {
+    background: var(--surface);
+    border: 1px solid var(--border);
+    border-radius: 20px;
+    padding: 32px;
+    text-align: center;
+    max-width: 420px;
+    width: 100%;
+  }
+
+  .qr-panel h2 {
+    font-family: 'Syne', sans-serif;
+    font-size: 18px;
+    font-weight: 700;
+    margin-bottom: 8px;
+  }
+
+  .qr-panel p {
+    color: var(--text-muted);
+    font-size: 13px;
+    margin-bottom: 24px;
+    line-height: 1.5;
+  }
+
+  .qr-box {
+    width: 220px; height: 220px;
+    margin: 0 auto 24px;
+    background: white;
+    border-radius: 16px;
+    display: flex;
+    align-items: center;
+    justify-content: center;
+    overflow: hidden;
+    position: relative;
+  }
+
+  .qr-box img { width: 100%; height: 100%; object-fit: contain; }
+
+  .qr-placeholder {
+    display: flex;
+    flex-direction: column;
+    align-items: center;
+    gap: 12px;
+    color: #aaa;
+    font-size: 13px;
+  }
+
+  .qr-placeholder svg { opacity: 0.3; }
+
+  .qr-connected {
+    display: flex;
+    flex-direction: column;
+    align-items: center;
+    gap: 12px;
+  }
+
+  .check-circle {
+    width: 64px; height: 64px;
+    background: var(--green);
+    border-radius: 50%;
+    display: flex;
+    align-items: center;
+    justify-content: center;
+    font-size: 32px;
+    animation: pop 0.4s cubic-bezier(0.34,1.56,0.64,1);
+  }
+
+  @keyframes pop {
+    from { transform: scale(0); opacity: 0; }
+    to { transform: scale(1); opacity: 1; }
+  }
+
+  .btn {
+    padding: 11px 24px;
+    border-radius: 10px;
+    border: none;
+    font-family: 'DM Sans', sans-serif;
+    font-size: 14px;
+    font-weight: 500;
+    cursor: pointer;
+    transition: all 0.2s;
+    display: inline-flex;
+    align-items: center;
+    gap: 8px;
+  }
+
+  .btn-primary {
+    background: var(--green);
+    color: #000;
+  }
+
+  .btn-primary:hover { background: #1ebe5a; transform: translateY(-1px); }
+  .btn-primary:disabled { opacity: 0.5; cursor: not-allowed; transform: none; }
+
+  .btn-danger {
+    background: rgba(248,81,73,0.15);
+    color: var(--danger);
+    border: 1px solid rgba(248,81,73,0.3);
+  }
+
+  .btn-danger:hover { background: rgba(248,81,73,0.25); }
+
+  .btn-secondary {
+    background: var(--surface2);
+    color: var(--text);
+    border: 1px solid var(--border);
+  }
+
+  .btn-secondary:hover { background: var(--border); }
+
+  .btn-sm { padding: 7px 14px; font-size: 13px; }
+
+  /* ── Tab 2: Configurações ── */
+  #tab-settings {
+    flex-direction: column;
+    max-width: 900px;
+    margin: 0 auto;
+    width: 100%;
+    padding: 32px 24px;
+    gap: 24px;
+  }
+
+  .settings-section {
+    background: var(--surface);
+    border: 1px solid var(--border);
+    border-radius: var(--radius);
+    padding: 24px;
+  }
+
+  .section-header {
+    display: flex;
+    align-items: center;
+    justify-content: space-between;
+    margin-bottom: 20px;
+  }
+
+  .section-title {
+    font-family: 'Syne', sans-serif;
+    font-size: 15px;
+    font-weight: 700;
+    display: flex;
+    align-items: center;
+    gap: 8px;
+  }
+
+  .form-group {
+    margin-bottom: 16px;
+  }
+
+  label {
+    display: block;
+    font-size: 13px;
+    font-weight: 500;
+    color: var(--text-muted);
+    margin-bottom: 6px;
+    text-transform: uppercase;
+    letter-spacing: 0.5px;
+  }
+
+  input[type="text"], textarea {
+    width: 100%;
+    background: var(--bg);
+    border: 1px solid var(--border);
+    border-radius: 8px;
+    padding: 10px 14px;
+    color: var(--text);
+    font-family: 'DM Sans', sans-serif;
+    font-size: 14px;
+    transition: border-color 0.2s;
+    outline: none;
+  }
+
+  input[type="text"]:focus, textarea:focus {
+    border-color: var(--green);
+  }
+
+  textarea { resize: vertical; min-height: 80px; }
+
+  /* ── Menu Builder ── */
+  .menu-tree {
+    display: flex;
+    flex-direction: column;
+    gap: 8px;
+  }
+
+  .menu-item {
+    background: var(--bg);
+    border: 1px solid var(--border);
+    border-radius: 10px;
+    overflow: hidden;
+  }
+
+  .menu-item-header {
+    display: flex;
+    align-items: center;
+    gap: 10px;
+    padding: 12px 16px;
+    cursor: pointer;
+    transition: background 0.15s;
+    user-select: none;
+  }
+
+  .menu-item-header:hover { background: var(--surface2); }
+
+  .item-number {
+    width: 26px; height: 26px;
+    background: var(--surface2);
+    border: 1px solid var(--border);
+    border-radius: 6px;
+    display: flex; align-items: center; justify-content: center;
+    font-size: 12px;
+    font-weight: 700;
+    color: var(--green);
+    flex-shrink: 0;
+  }
+
+  .item-label {
+    flex: 1;
+    font-size: 14px;
+    font-weight: 500;
+  }
+
+  .item-badge {
+    font-size: 11px;
+    padding: 2px 8px;
+    border-radius: 999px;
+    background: rgba(37,211,102,0.15);
+    color: var(--green);
+    border: 1px solid rgba(37,211,102,0.3);
+  }
+
+  .item-badge.final {
+    background: rgba(210,153,34,0.15);
+    color: var(--warning);
+    border-color: rgba(210,153,34,0.3);
+  }
+
+  .chevron {
+    color: var(--text-muted);
+    transition: transform 0.2s;
+    font-size: 12px;
+  }
+
+  .menu-item.open .chevron { transform: rotate(90deg); }
+
+  .menu-item-body {
+    display: none;
+    padding: 0 16px 16px;
+    border-top: 1px solid var(--border);
+    margin-top: 0;
+  }
+
+  .menu-item.open .menu-item-body { display: block; }
+
+  .item-form { padding-top: 14px; }
+
+  .item-form .form-group { margin-bottom: 12px; }
+
+  .children-list {
+    margin-top: 12px;
+    display: flex;
+    flex-direction: column;
+    gap: 6px;
+    padding-left: 16px;
+    border-left: 2px solid var(--border);
+  }
+
+  .child-item {
+    background: var(--surface);
+    border: 1px solid var(--border);
+    border-radius: 8px;
+    overflow: hidden;
+  }
+
+  .child-item-header {
+    display: flex;
+    align-items: center;
+    gap: 8px;
+    padding: 10px 14px;
+    cursor: pointer;
+  }
+
+  .child-item-header:hover { background: var(--surface2); }
+
+  .child-item-body {
+    display: none;
+    padding: 0 14px 14px;
+    border-top: 1px solid var(--border);
+  }
+
+  .child-item.open .child-item-body { display: block; }
+
+  .child-item.open .chevron { transform: rotate(90deg); }
+
+  .item-actions {
+    display: flex;
+    gap: 8px;
+    margin-top: 12px;
+  }
+
+  .btn-icon {
+    width: 30px; height: 30px;
+    border-radius: 6px;
+    border: 1px solid var(--border);
+    background: var(--surface2);
+    color: var(--text-muted);
+    display: flex; align-items: center; justify-content: center;
+    cursor: pointer;
+    font-size: 14px;
+    transition: all 0.15s;
+  }
+
+  .btn-icon:hover { border-color: var(--danger); color: var(--danger); }
+  .btn-icon.add:hover { border-color: var(--green); color: var(--green); }
+
+  .add-root-btn {
+    border: 2px dashed var(--border);
+    border-radius: 10px;
+    padding: 14px;
+    text-align: center;
+    cursor: pointer;
+    color: var(--text-muted);
+    font-size: 13px;
+    transition: all 0.2s;
+    display: flex;
+    align-items: center;
+    justify-content: center;
+    gap: 8px;
+    background: none;
+    width: 100%;
+  }
+
+  .add-root-btn:hover {
+    border-color: var(--green);
+    color: var(--green);
+    background: rgba(37,211,102,0.05);
+  }
+
+  /* Toast */
+  .toast {
+    position: fixed;
+    bottom: 24px;
+    right: 24px;
+    background: var(--surface);
+    border: 1px solid var(--border);
+    border-radius: 12px;
+    padding: 14px 20px;
+    display: flex;
+    align-items: center;
+    gap: 12px;
+    font-size: 14px;
+    font-weight: 500;
+    z-index: 999;
+    transform: translateY(100px);
+    opacity: 0;
+    transition: all 0.3s cubic-bezier(0.34,1.56,0.64,1);
+    max-width: 320px;
+  }
+
+  .toast.show { transform: translateY(0); opacity: 1; }
+  .toast.success { border-color: rgba(37,211,102,0.4); }
+  .toast.error { border-color: rgba(248,81,73,0.4); }
+
+  /* Spinner */
+  .spinner {
+    width: 20px; height: 20px;
+    border: 2px solid rgba(37,211,102,0.3);
+    border-top-color: var(--green);
+    border-radius: 50%;
+    animation: spin 0.8s linear infinite;
+    flex-shrink: 0;
+  }
+
+  @keyframes spin { to { transform: rotate(360deg); } }
+
+  .divider {
+    height: 1px;
+    background: var(--border);
+    margin: 16px 0;
+  }
+
+  .info-box {
+    background: rgba(37,211,102,0.08);
+    border: 1px solid rgba(37,211,102,0.2);
+    border-radius: 8px;
+    padding: 12px 16px;
+    font-size: 13px;
+    color: var(--text-muted);
+    line-height: 1.5;
+  }
+
+  .info-box strong { color: var(--green); }
+
+  /* scrollbar */
+  ::-webkit-scrollbar { width: 6px; }
+  ::-webkit-scrollbar-track { background: transparent; }
+  ::-webkit-scrollbar-thumb { background: var(--border); border-radius: 3px; }
+
+  /* ── License Modal ── */
+  .license-overlay {
+    position: fixed; inset: 0;
+    background: rgba(0,0,0,0.85);
+    z-index: 9999;
+    display: flex;
+    align-items: center;
+    justify-content: center;
+    backdrop-filter: blur(6px);
+  }
+
+  .license-overlay.hidden { display: none; }
+
+  .license-card {
+    background: var(--surface);
+    border: 1px solid var(--border);
+    border-radius: 20px;
+    padding: 40px 36px;
+    max-width: 480px;
+    width: 90%;
+    text-align: center;
+  }
+
+  .license-icon {
+    font-size: 48px;
+    margin-bottom: 16px;
+  }
+
+  .license-card h2 {
+    font-family: 'Syne', sans-serif;
+    font-size: 22px;
+    font-weight: 800;
+    margin-bottom: 8px;
+  }
+
+  .license-card p {
+    color: var(--text-muted);
+    font-size: 14px;
+    line-height: 1.6;
+    margin-bottom: 24px;
+  }
+
+  .machine-id-box {
+    background: var(--bg);
+    border: 1px solid var(--border);
+    border-radius: 10px;
+    padding: 14px 18px;
+    font-family: 'Courier New', monospace;
+    font-size: 15px;
+    font-weight: 700;
+    letter-spacing: 2px;
+    color: var(--green);
+    margin-bottom: 24px;
+    cursor: pointer;
+    transition: border-color 0.2s;
+    user-select: all;
+    display: flex;
+    align-items: center;
+    justify-content: space-between;
+    gap: 12px;
+  }
+
+  .machine-id-box:hover { border-color: var(--green); }
+
+  .machine-id-copy {
+    font-size: 12px;
+    color: var(--text-muted);
+    font-family: 'DM Sans', sans-serif;
+    font-weight: 400;
+    letter-spacing: 0;
+    flex-shrink: 0;
+  }
+
+  .license-input-wrap {
+    display: flex;
+    gap: 8px;
+    margin-bottom: 12px;
+  }
+
+  .license-input-wrap input {
+    flex: 1;
+    font-family: 'Courier New', monospace;
+    letter-spacing: 2px;
+    font-size: 14px;
+    text-transform: uppercase;
+  }
+
+  .license-error {
+    color: var(--danger);
+    font-size: 13px;
+    min-height: 20px;
+    margin-bottom: 8px;
+  }
+
+  /* ── Sobre Tab ── */
+  #tab-about {
+    flex-direction: column;
+    max-width: 720px;
+    margin: 0 auto;
+    width: 100%;
+    padding: 32px 24px;
+    gap: 20px;
+  }
+
+  .about-header {
+    background: linear-gradient(135deg, var(--green-dark), var(--green));
+    border-radius: var(--radius);
+    padding: 32px;
+    text-align: center;
+    color: #000;
+  }
+
+  .about-header h2 {
+    font-family: 'Syne', sans-serif;
+    font-size: 20px;
+    font-weight: 800;
+    margin-bottom: 6px;
+  }
+
+  .about-header p {
+    font-size: 13px;
+    opacity: 0.75;
+  }
+
+  .about-card {
+    background: var(--surface);
+    border: 1px solid var(--border);
+    border-radius: var(--radius);
+    padding: 24px;
+  }
+
+  .about-card-title {
+    font-family: 'Syne', sans-serif;
+    font-size: 13px;
+    font-weight: 700;
+    text-transform: uppercase;
+    letter-spacing: 1px;
+    color: var(--text-muted);
+    margin-bottom: 16px;
+    display: flex;
+    align-items: center;
+    gap: 8px;
+  }
+
+  .about-row {
+    display: flex;
+    align-items: center;
+    gap: 12px;
+    padding: 10px 0;
+    border-bottom: 1px solid var(--border);
+    font-size: 14px;
+  }
+
+  .about-row:last-child { border-bottom: none; }
+
+  .about-row-label {
+    color: var(--text-muted);
+    width: 110px;
+    flex-shrink: 0;
+    font-size: 13px;
+  }
+
+  .about-row-value {
+    color: var(--text);
+    font-weight: 500;
+  }
+
+  .about-version-badge {
+    display: inline-flex;
+    align-items: center;
+    gap: 6px;
+    background: rgba(37,211,102,0.12);
+    border: 1px solid rgba(37,211,102,0.3);
+    border-radius: 999px;
+    padding: 4px 12px;
+    font-size: 12px;
+    color: var(--green);
+    font-weight: 600;
+    margin-top: 12px;
+  }
+
+</style>
+</head>
+<body>
+
+<!-- License Activation Modal -->
+<div class="license-overlay hidden" id="licenseOverlay">
+  <div class="license-card">
+    <div class="license-icon">🔐</div>
+    <h2>Ativação de Licença</h2>
+    <p>Este software é licenciado por máquina. Envie o <strong>ID desta máquina</strong> para o fornecedor e insira o código de ativação recebido.</p>
+
+    <div class="machine-id-box" onclick="copyMachineId()" title="Clique para copiar">
+      <span id="machineIdText">Carregando...</span>
+      <span class="machine-id-copy" id="copyHint">📋 Copiar</span>
+    </div>
+
+    <div class="license-input-wrap">
+      <input type="text" id="activationCodeInput" placeholder="XXXX-XXXX-XXXX-XXXX" maxlength="19"
+        oninput="formatLicenseInput(this)" onkeydown="if(event.key==='Enter') activateLicense()">
+      <button class="btn btn-primary" onclick="activateLicense()">Ativar</button>
+    </div>
+    <div class="license-error" id="licenseError"></div>
+
+    <div style="margin-top:16px;padding-top:16px;border-top:1px solid var(--border)">
+      <p style="font-size:12px;margin-bottom:0">
+        Suporte: <strong style="color:var(--text)">VPG Soluções em Tecnologia</strong><br>
+        📞 (47) 9 9955-1462
+      </p>
+    </div>
+  </div>
+</div>
+
+<!-- Header -->
+<header>
+  <div class="header-brand">
+    <div class="logo-icon">🤖</div>
+    <h1>WhatsApp Bot Manager</h1>
+  </div>
+  <div class="bot-status-pill" id="statusPill">
+    <div class="status-dot" id="statusDot"></div>
+    <span id="statusText">Desconectado</span>
+  </div>
+</header>
+
+<!-- Tabs Nav -->
+<div class="tabs-nav">
+  <button class="tab-btn active" onclick="switchTab('connection')" id="tab-btn-connection">
+    <span>📱</span> Conexão
+  </button>
+  <button class="tab-btn" onclick="switchTab('settings')" id="tab-btn-settings">
+    <span>⚙️</span> Configurações
+  </button>
+  <button class="tab-btn" onclick="switchTab('about')" id="tab-btn-about">
+    <span>ℹ️</span> Sobre
+  </button>
+</div>
+
+<!-- ── Tab Conexão ── -->
+<div class="tab-content active" id="tab-connection">
+  <!-- Business Card -->
+  <div class="business-card">
+    <input type="file" id="logoInput" accept="image/*" style="display:none" onchange="handleLogoUpload(event)">
+    <div class="business-logo-wrap" onclick="document.getElementById('logoInput').click()" title="Clique para alterar o logo">
+      <span id="logoEmoji">🏢</span>
+      <img id="logoImg" src="" style="display:none">
+      <div class="logo-overlay">📷</div>
+    </div>
+    <div class="business-name-display" id="businessNameDisplay">Meu Negócio</div>
+    <div class="business-subtitle">Bot de Atendimento WhatsApp</div>
+  </div>
+
+  <!-- QR Panel -->
+  <div class="qr-panel">
+    <h2>Conectar WhatsApp</h2>
+    <p>Inicie o bot e escaneie o QR Code com seu WhatsApp para conectar o bot ao seu número.</p>
+
+    <div class="qr-box" id="qrBox">
+      <div class="qr-placeholder" id="qrPlaceholder">
+        <svg width="64" height="64" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="1.5">
+          <rect x="3" y="3" width="7" height="7" rx="1"/><rect x="14" y="3" width="7" height="7" rx="1"/>
+          <rect x="3" y="14" width="7" height="7" rx="1"/>
+          <rect x="14" y="14" width="3" height="3" rx="0.5"/>
+          <rect x="19" y="14" width="2" height="2" rx="0.5"/>
+          <rect x="14" y="19" width="2" height="2" rx="0.5"/>
+          <rect x="18" y="18" width="3" height="3" rx="0.5"/>
+        </svg>
+        <span>Aguardando início...</span>
+      </div>
+      <div id="qrLoading" style="display:none">
+        <div class="spinner"></div>
+      </div>
+      <img id="qrImage" src="" style="display:none" alt="QR Code">
+      <div id="qrConnected" style="display:none" class="qr-connected">
+        <div class="check-circle">✓</div>
+        <span style="color:#aaa;font-size:13px">Conectado!</span>
+      </div>
+    </div>
+
+    <div class="info-box" style="margin-bottom:20px">
+      📌 Abra o WhatsApp → <strong>Dispositivos vinculados</strong> → <strong>Vincular um dispositivo</strong> → Escaneie o QR Code
+    </div>
+
+    <div style="display:flex;gap:10px;justify-content:center">
+      <button class="btn btn-primary" id="btnStart" onclick="startBot()">
+        ▶ Iniciar Bot
+      </button>
+      <button class="btn btn-danger" id="btnStop" onclick="stopBot()" style="display:none">
+        ■ Parar Bot
+      </button>
+    </div>
+  </div>
+</div>
+
+<!-- ── Tab Configurações ── -->
+<div class="tab-content" id="tab-settings">
+
+  <!-- Info básica -->
+  <div class="settings-section">
+    <div class="section-header">
+      <div class="section-title">🏢 Informações do Negócio</div>
+    </div>
+    <div class="form-group">
+      <label>Nome do Negócio</label>
+      <input type="text" id="businessName" placeholder="Ex: Loja do João" oninput="updateBusinessName()">
+    </div>
+    <div class="form-group">
+      <label>Mensagem de Boas-vindas</label>
+      <textarea id="welcomeMessage" placeholder="Ex: Olá! Bem-vindo à nossa loja. Como posso ajudar?"></textarea>
+    </div>
+    <div class="info-box">
+      💡 O cliente pode digitar <strong>/menu</strong> a qualquer momento para reiniciar o atendimento.
+    </div>
+  </div>
+
+  <!-- Menu Builder -->
+  <div class="settings-section">
+    <div class="section-header">
+      <div class="section-title">🗂️ Fluxo de Atendimento</div>
+      <span style="font-size:12px;color:var(--text-muted)">Máx. 2 níveis de submenu</span>
+    </div>
+
+    <div class="menu-tree" id="menuTree"></div>
+    <div style="margin-top:10px">
+      <button class="add-root-btn" onclick="addRootItem()">＋ Adicionar opção de menu</button>
+    </div>
+  </div>
+
+  <!-- Save -->
+  <div style="display:flex;justify-content:flex-end;gap:10px;padding-bottom:16px">
+    <button class="btn btn-secondary" onclick="loadConfig()">↺ Descartar alterações</button>
+    <button class="btn btn-primary" onclick="saveConfig()">💾 Salvar configurações</button>
+  </div>
+
+</div>
+
+<!-- ── Tab Sobre ── -->
+<div class="tab-content" id="tab-about">
+
+  <div class="about-header">
+    <h2>VPG Bot de Atendimento WhatsApp</h2>
+    <p>Sistema desenvolvido exclusivamente para o cliente abaixo</p>
+    <div class="about-version-badge">✦ Versão 1.0 — Licença Individual</div>
+  </div>
+
+  <!-- Fornecedor -->
+  <div class="about-card">
+    <div class="about-card-title"><span>🏭</span> Fornecedor</div>
+    <div class="about-row">
+      <span class="about-row-label">Empresa</span>
+      <span class="about-row-value">VPG Soluções em Tecnologia</span>
+    </div>
+    <div class="about-row">
+      <span class="about-row-label">Responsável</span>
+      <span class="about-row-value">Vinicius Garcia</span>
+    </div>
+    <div class="about-row">
+      <span class="about-row-label">Telefone</span>
+      <span class="about-row-value">(47) 9 9955-1462</span>
+    </div>
+  </div>
+
+  <!-- Cliente -->
+  <div class="about-card">
+    <div class="about-card-title"><span>🏢</span> Cliente</div>
+    <div class="about-row">
+      <span class="about-row-label">Empresa</span>
+      <span class="about-row-value">Paddock Oficina</span>
+    </div>
+    <div class="about-row">
+      <span class="about-row-label">Responsável</span>
+      <span class="about-row-value">Djorge Neuhaus</span>
+    </div>
+    <div class="about-row">
+      <span class="about-row-label">Telefone</span>
+      <span class="about-row-value">(47) 9 3383-0600</span>
+    </div>
+  </div>
+
+  <!-- Aviso legal -->
+  <div class="info-box" style="font-size:12px;line-height:1.7">
+    ⚠️ <strong>Licença de Uso Individual:</strong> Este software é licenciado para uso exclusivo na máquina onde foi ativado.
+  </div>
+
+</div>
+
+<!-- Toast -->
+<div class="toast" id="toast">
+  <span id="toastIcon">✓</span>
+  <span id="toastMsg">Salvo!</span>
+</div>
+
+<script>
+// ── State ──────────────────────────────────────────────────────────────────
+let config = { business_name: '', business_logo: '', welcome_message: '', menu: [] };
+let ws = null;
+let botStatus = 'stopped';
+
+// ── Tabs ───────────────────────────────────────────────────────────────────
+function switchTab(name) {
+  document.querySelectorAll('.tab-content').forEach(t => t.classList.remove('active'));
+  document.querySelectorAll('.tab-btn').forEach(b => b.classList.remove('active'));
+  document.getElementById('tab-' + name).classList.add('active');
+  document.getElementById('tab-btn-' + name).classList.add('active');
+}
+
+// ── Toast ──────────────────────────────────────────────────────────────────
+function showToast(msg, type = 'success') {
+  const toast = document.getElementById('toast');
+  toast.className = 'toast ' + type;
+  document.getElementById('toastIcon').textContent = type === 'success' ? '✓' : '✕';
+  document.getElementById('toastMsg').textContent = msg;
+  toast.classList.add('show');
+  setTimeout(() => toast.classList.remove('show'), 3000);
+}
+
+// ── WebSocket ──────────────────────────────────────────────────────────────
+function connectWS() {
+  const proto = location.protocol === 'https:' ? 'wss' : 'ws';
+  ws = new WebSocket(`${proto}://${location.host}/ws`);
+
+  ws.onmessage = (e) => {
+    const data = JSON.parse(e.data);
+    if (data.type === 'qr') showQR(data.data);
+    if (data.type === 'bot_status') updateBotStatus(data.status);
+  };
+
+  ws.onclose = () => setTimeout(connectWS, 2000);
+}
+
+// ── QR & Status ───────────────────────────────────────────────────────────
+function showQR(dataUrl) {
+  document.getElementById('qrPlaceholder').style.display = 'none';
+  document.getElementById('qrLoading').style.display = 'none';
+  document.getElementById('qrConnected').style.display = 'none';
+  const img = document.getElementById('qrImage');
+  img.src = dataUrl;
+  img.style.display = 'block';
+  updateBotStatus('waiting_qr');
+}
+
+function updateBotStatus(status) {
+  botStatus = status;
+  const dot = document.getElementById('statusDot');
+  const text = document.getElementById('statusText');
+  const start = document.getElementById('btnStart');
+  const stop = document.getElementById('btnStop');
+
+  dot.className = 'status-dot';
+
+  if (status === 'connected') {
+    dot.classList.add('connected');
+    text.textContent = 'Conectado';
+    document.getElementById('qrPlaceholder').style.display = 'none';
+    document.getElementById('qrLoading').style.display = 'none';
+    document.getElementById('qrImage').style.display = 'none';
+    document.getElementById('qrConnected').style.display = 'flex';
+    start.style.display = 'none';
+    stop.style.display = 'inline-flex';
+    showToast('WhatsApp conectado com sucesso!', 'success');
+  } else if (status === 'waiting_qr' || status === 'authenticated') {
+    dot.classList.add('connecting');
+    text.textContent = status === 'authenticated' ? 'Autenticando...' : 'Aguardando QR';
+    start.style.display = 'none';
+    stop.style.display = 'inline-flex';
+  } else if (status === 'stopped') {
+    text.textContent = 'Desconectado';
+    document.getElementById('qrPlaceholder').style.display = 'flex';
+    document.getElementById('qrLoading').style.display = 'none';
+    document.getElementById('qrImage').style.display = 'none';
+    document.getElementById('qrConnected').style.display = 'none';
+    start.style.display = 'inline-flex';
+    stop.style.display = 'none';
+  }
+}
+
+async function startBot() {
+  document.getElementById('qrPlaceholder').style.display = 'none';
+  document.getElementById('qrLoading').style.display = 'flex';
+  document.getElementById('btnStart').disabled = true;
+
+  const r = await fetch('/api/bot/start', { method: 'POST' });
+  const d = await r.json();
+
+  if (d.status === 'error') {
+    showToast(d.message, 'error');
+    document.getElementById('btnStart').disabled = false;
+    document.getElementById('qrLoading').style.display = 'none';
+    document.getElementById('qrPlaceholder').style.display = 'flex';
+  } else {
+    document.getElementById('btnStart').style.display = 'none';
+    document.getElementById('btnStop').style.display = 'inline-flex';
+    document.getElementById('statusDot').classList.add('connecting');
+    document.getElementById('statusText').textContent = 'Iniciando...';
+  }
+}
+
+async function stopBot() {
+  await fetch('/api/bot/stop', { method: 'POST' });
+  updateBotStatus('stopped');
+  document.getElementById('btnStart').disabled = false;
+}
+
+// ── Config Load/Save ──────────────────────────────────────────────────────
+async function loadConfig() {
+  const r = await fetch('/api/config');
+  config = await r.json();
+
+  document.getElementById('businessName').value = config.business_name || '';
+  document.getElementById('welcomeMessage').value = config.welcome_message || '';
+  document.getElementById('businessNameDisplay').textContent = config.business_name || 'Meu Negócio';
+
+  if (config.business_logo) {
+    document.getElementById('logoImg').src = config.business_logo;
+    document.getElementById('logoImg').style.display = 'block';
+    document.getElementById('logoEmoji').style.display = 'none';
+  }
+
+  renderMenuTree();
+}
+
+async function saveConfig() {
+  config.business_name = document.getElementById('businessName').value;
+  config.welcome_message = document.getElementById('welcomeMessage').value;
+
+  const r = await fetch('/api/config', {
+    method: 'POST',
+    headers: { 'Content-Type': 'application/json' },
+    body: JSON.stringify(config)
+  });
+  const d = await r.json();
+  showToast(d.message || 'Salvo!', 'success');
+}
+
+function updateBusinessName() {
+  const val = document.getElementById('businessName').value;
+  document.getElementById('businessNameDisplay').textContent = val || 'Meu Negócio';
+  config.business_name = val;
+}
+
+function handleLogoUpload(e) {
+  const file = e.target.files[0];
+  if (!file) return;
+  const reader = new FileReader();
+  reader.onload = (ev) => {
+    config.business_logo = ev.target.result;
+    document.getElementById('logoImg').src = ev.target.result;
+    document.getElementById('logoImg').style.display = 'block';
+    document.getElementById('logoEmoji').style.display = 'none';
+  };
+  reader.readAsDataURL(file);
+}
+
+// ── Menu Builder ──────────────────────────────────────────────────────────
+function generateId() {
+  return Date.now().toString(36) + Math.random().toString(36).slice(2, 5);
+}
+
+function renderMenuTree() {
+  const tree = document.getElementById('menuTree');
+  tree.innerHTML = '';
+  (config.menu || []).forEach((item, i) => {
+    tree.appendChild(createRootItem(item, i));
+  });
+}
+
+function createRootItem(item, index) {
+  const div = document.createElement('div');
+  div.className = 'menu-item';
+  div.dataset.index = index;
+
+  const hasChildren = item.children && item.children.length > 0;
+  const badgeText = hasChildren ? `${item.children.length} subopções` : 'Resposta final';
+  const badgeClass = hasChildren ? '' : 'final';
+
+  div.innerHTML = `
+    <div class="menu-item-header" onclick="toggleItem(this.parentElement)">
+      <div class="item-number">${index + 1}</div>
+      <div class="item-label">${item.text || 'Nova opção'}</div>
+      <span class="item-badge ${badgeClass}">${badgeText}</span>
+      <span class="chevron">›</span>
+    </div>
+    <div class="menu-item-body">
+      <div class="item-form">
+        <div class="form-group">
+          <label>Texto da opção</label>
+          <input type="text" value="${escapeHtml(item.text || '')}" placeholder="Ex: 📦 Produtos"
+            oninput="updateItemText(${index}, this.value)">
+        </div>
+        <div class="form-group" id="finalResponse-${index}" ${hasChildren ? 'style="display:none"' : ''}>
+          <label>Resposta final</label>
+          <textarea placeholder="Mensagem enviada ao cliente ao escolher esta opção..."
+            oninput="updateItemFinalResponse(${index}, this.value)">${escapeHtml(item.final_response || '')}</textarea>
+        </div>
+        <div class="children-list" id="children-${index}"></div>
+        <div class="item-actions">
+          <button class="btn btn-sm btn-secondary" onclick="addChild(${index})" title="Adicionar subopção">
+            ＋ Adicionar subopção
+          </button>
+          <div style="flex:1"></div>
+          <button class="btn-icon" onclick="removeRootItem(${index})" title="Remover">🗑</button>
+        </div>
+      </div>
+    </div>
+  `;
+
+  // Render children
+  const childrenContainer = div.querySelector(`#children-${index}`);
+  (item.children || []).forEach((child, ci) => {
+    childrenContainer.appendChild(createChildItem(child, index, ci));
+  });
+
+  return div;
+}
+
+function createChildItem(item, parentIndex, childIndex) {
+  const div = document.createElement('div');
+  div.className = 'child-item';
+
+  div.innerHTML = `
+    <div class="child-item-header" onclick="toggleChildItem(this.parentElement)">
+      <div class="item-number" style="width:22px;height:22px;font-size:11px">${parentIndex+1}.${childIndex+1}</div>
+      <div class="item-label" style="font-size:13px">${item.text || 'Nova subopção'}</div>
+      <span class="item-badge final" style="font-size:10px">Resposta final</span>
+      <span class="chevron" style="font-size:11px">›</span>
+    </div>
+    <div class="child-item-body">
+      <div style="padding-top:12px">
+        <div class="form-group">
+          <label>Texto da subopção</label>
+          <input type="text" value="${escapeHtml(item.text || '')}" placeholder="Ex: Ver catálogo"
+            oninput="updateChildText(${parentIndex}, ${childIndex}, this.value)">
+        </div>
+        <div class="form-group">
+          <label>Resposta ao cliente</label>
+          <textarea placeholder="Mensagem final enviada ao cliente..."
+            oninput="updateChildFinalResponse(${parentIndex}, ${childIndex}, this.value)">${escapeHtml(item.final_response || '')}</textarea>
+        </div>
+        <div style="display:flex;justify-content:flex-end">
+          <button class="btn-icon" onclick="removeChild(${parentIndex}, ${childIndex})" title="Remover subopção">🗑</button>
+        </div>
+      </div>
+    </div>
+  `;
+  return div;
+}
+
+function toggleItem(el) { el.classList.toggle('open'); }
+function toggleChildItem(el) { el.classList.toggle('open'); }
+
+function addRootItem() {
+  if (!config.menu) config.menu = [];
+  config.menu.push({
+    id: generateId(),
+    text: '',
+    children: [],
+    final_response: ''
+  });
+  renderMenuTree();
+  // Open last item
+  const items = document.querySelectorAll('.menu-item');
+  if (items.length) items[items.length-1].classList.add('open');
+}
+
+function removeRootItem(index) {
+  config.menu.splice(index, 1);
+  renderMenuTree();
+}
+
+function addChild(parentIndex) {
+  if (!config.menu[parentIndex].children) config.menu[parentIndex].children = [];
+  config.menu[parentIndex].children.push({
+    id: generateId(),
+    text: '',
+    children: [],
+    final_response: ''
+  });
+  config.menu[parentIndex].final_response = null;
+  renderMenuTree();
+  // Reopen parent
+  const items = document.querySelectorAll('.menu-item');
+  if (items[parentIndex]) items[parentIndex].classList.add('open');
+}
+
+function removeChild(parentIndex, childIndex) {
+  config.menu[parentIndex].children.splice(childIndex, 1);
+  if (config.menu[parentIndex].children.length === 0) {
+    config.menu[parentIndex].final_response = '';
+  }
+  renderMenuTree();
+  const items = document.querySelectorAll('.menu-item');
+  if (items[parentIndex]) items[parentIndex].classList.add('open');
+}
+
+function updateItemText(index, val) {
+  config.menu[index].text = val;
+  const header = document.querySelectorAll('.menu-item')[index].querySelector('.item-label');
+  header.textContent = val || 'Nova opção';
+}
+
+function updateItemFinalResponse(index, val) {
+  config.menu[index].final_response = val;
+}
+
+function updateChildText(parentIndex, childIndex, val) {
+  config.menu[parentIndex].children[childIndex].text = val;
+  const parentEl = document.querySelectorAll('.menu-item')[parentIndex];
+  const childLabels = parentEl.querySelectorAll('.child-item .item-label');
+  if (childLabels[childIndex]) childLabels[childIndex].textContent = val || 'Nova subopção';
+}
+
+function updateChildFinalResponse(parentIndex, childIndex, val) {
+  config.menu[parentIndex].children[childIndex].final_response = val;
+}
+
+function escapeHtml(str) {
+  return (str || '').replace(/&/g,'&amp;').replace(/</g,'&lt;').replace(/>/g,'&gt;').replace(/"/g,'&quot;');
+}
+
+// ── License ───────────────────────────────────────────────────────────────
+async function checkLicenseOnLoad() {
+  try {
+    const r = await fetch('/api/license/status');
+    const d = await r.json();
+    if (!d.licensed) {
+      document.getElementById('machineIdText').textContent = d.machine_id || '—';
+      document.getElementById('licenseOverlay').classList.remove('hidden');
+    }
+  } catch (e) {
+    console.error('Erro ao verificar licença:', e);
+  }
+}
+
+function copyMachineId() {
+  const text = document.getElementById('machineIdText').textContent;
+  navigator.clipboard.writeText(text).then(() => {
+    document.getElementById('copyHint').textContent = '✓ Copiado!';
+    setTimeout(() => { document.getElementById('copyHint').textContent = '📋 Copiar'; }, 2000);
+  });
+}
+
+function formatLicenseInput(el) {
+  let v = el.value.replace(/[^A-Za-z0-9]/g, '').toUpperCase();
+  let out = '';
+  for (let i = 0; i < Math.min(v.length, 16); i++) {
+    if (i > 0 && i % 4 === 0) out += '-';
+    out += v[i];
+  }
+  el.value = out;
+}
+
+async function activateLicense() {
+  const code = document.getElementById('activationCodeInput').value.trim();
+  const errEl = document.getElementById('licenseError');
+  errEl.textContent = '';
+
+  if (code.length < 19) {
+    errEl.textContent = 'Informe o código completo no formato XXXX-XXXX-XXXX-XXXX.';
+    return;
+  }
+
+  try {
+    const r = await fetch('/api/license/activate', {
+      method: 'POST',
+      headers: { 'Content-Type': 'application/json' },
+      body: JSON.stringify({ code })
+    });
+    const d = await r.json();
+    if (r.ok) {
+      document.getElementById('licenseOverlay').classList.add('hidden');
+      showToast('Licença ativada com sucesso!', 'success');
+    } else {
+      errEl.textContent = d.detail || 'Código inválido.';
+    }
+  } catch (e) {
+    errEl.textContent = 'Erro ao conectar com o servidor.';
+  }
+}
+
+// ── Init ──────────────────────────────────────────────────────────────────
+checkLicenseOnLoad();
+connectWS();
+loadConfig();
+
+// Check initial status
+fetch('/api/bot/status').then(r => r.json()).then(d => {
+  if (d.status === 'running') updateBotStatus('waiting_qr');
+});
+</script>
+</body>
+</html>

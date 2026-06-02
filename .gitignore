@@ -1,0 +1,9 @@
+venv/
+.venv/
+__pycache__/
+*.db
+.env
+node_modules/
+.wwebjs_auth/
+.wwebjs_cache/
+data/
