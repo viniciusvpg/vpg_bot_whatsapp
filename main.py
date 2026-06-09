@@ -2,106 +2,19 @@ from fastapi import FastAPI, HTTPException, WebSocket, WebSocketDisconnect
 from fastapi.staticfiles import StaticFiles
 from fastapi.responses import HTMLResponse, FileResponse
 from pydantic import BaseModel
-from typing import Optional, List
+from typing import Optional, List, Dict
 import json
 import os
-import asyncio
 import subprocess
 import threading
-import platform
-import hashlib
-import hmac
-import base64
-import uuid as _uuid_mod
-from cryptography.fernet import Fernet, InvalidToken
 
 app = FastAPI(title="VPG Atendimento Whatsapp")
 
-DATA_FILE = "data/config.json"
-LICENSE_FILE = "data/license.dat"
-BOT_PROCESS = None
-connected_clients: List[WebSocket] = []
-
-# ── License System ────────────────────────────────────────────────────────────
-
-# Chave secreta interna — NÃO distribua ao cliente
-_SECRET = b"p8MeLk78TCrOFczSkWRD3"
-
-
-def get_machine_id() -> str:
-    parts = []
-    system_platform = platform.system()
-    
-    # Tenta pegar o ID no Windows
-    if system_platform == "Windows":
-        try:
-            import winreg
-            key = winreg.OpenKey(winreg.HKEY_LOCAL_MACHINE, r"SOFTWARE\Microsoft\Cryptography")
-            guid, _ = winreg.QueryValueEx(key, "MachineGuid")
-            parts.append(str(guid))
-        except Exception:
-            pass
-            
-    # Tenta pegar o ID no Linux (Oracle Cloud)
-    elif system_platform == "Linux":
-        try:
-            if os.path.exists("/etc/machine-id"):
-                with open("/etc/machine-id", "r") as f:
-                    parts.append(f.read().strip())
-        except Exception:
-            pass
-
-    # Fallback comum para ambos (Nome da máquina + ID da placa de rede)
-    parts.append(platform.node())
-    parts.append(str(_uuid_mod.getnode()))
-    
-    raw = "|".join(parts)
-    digest = hashlib.sha256(raw.encode("utf-8")).hexdigest().upper()
-    return f"{digest[:8]}-{digest[8:16]}-{digest[16:24]}"
-
-
-def _derive_fernet(machine_id: str) -> Fernet:
-    mat = hashlib.sha256((_SECRET.decode() + machine_id).encode("utf-8")).digest()
-    return Fernet(base64.urlsafe_b64encode(mat))
-
-
-def _expected_code(machine_id: str) -> str:
-    sig = hmac.new(_SECRET, machine_id.encode("utf-8"), hashlib.sha256).hexdigest().upper()
-    return f"{sig[:4]}-{sig[4:8]}-{sig[8:12]}-{sig[12:16]}"
-
-
-def verify_activation_code(machine_id: str, code: str) -> bool:
-    clean = code.replace("-", "").upper()
-    expected = _expected_code(machine_id).replace("-", "")
-    return hmac.compare_digest(clean, expected)
-
-
-def save_license(machine_id: str, code: str):
-    os.makedirs("data", exist_ok=True)
-    f = _derive_fernet(machine_id)
-    payload = f"{machine_id}:{code.replace('-', '').upper()}".encode("utf-8")
-    with open(LICENSE_FILE, "wb") as fp:
-        fp.write(f.encrypt(payload))
-
-
-def check_license() -> bool:
-    if not os.path.exists(LICENSE_FILE):
-        return False
-    try:
-        machine_id = get_machine_id()
-        f = _derive_fernet(machine_id)
-        with open(LICENSE_FILE, "rb") as fp:
-            encrypted = fp.read()
-        payload = f.decrypt(encrypted).decode("utf-8")
-        stored_id, stored_code = payload.split(":", 1)
-        if stored_id != machine_id:
-            return False
-        return verify_activation_code(machine_id, stored_code)
-    except (InvalidToken, ValueError, Exception):
-        return False
+# DICIONÁRIOS MULTI-TENANT (Isolamento de Sessões)
+BOT_PROCESSES: Dict[str, subprocess.Popen] = {}
+connected_clients: Dict[str, List[WebSocket]] = {}
 
 # ── Modelos ──────────────────────────────────────────────────────────────────
-
 class MenuItem(BaseModel):
     id: str
     text: str
@@ -117,14 +30,14 @@ class BotConfig(BaseModel):
     menu: List[MenuItem]
 
 
-class ActivationRequest(BaseModel):
-    code: str
+# ── Helpers (ISOLADOS POR SESSÃO) ─────────────────────────────────────────────
+def get_data_file(sessao: str) -> str:
+    return f"data/config_{sessao}.json"
 
-# ── Helpers ───────────────────────────────────────────────────────────────────
-
-def load_config() -> dict:
-    if os.path.exists(DATA_FILE):
-        with open(DATA_FILE, "r", encoding="utf-8") as f:
+def load_config(sessao: str) -> dict:
+    path = get_data_file(sessao)
+    if os.path.exists(path):
+        with open(path, "r", encoding="utf-8") as f:
             return json.load(f)
     return {
         "business_name": "Meu Negócio",
@@ -133,107 +46,88 @@ def load_config() -> dict:
         "menu": []
     }
 
-def save_config(config: dict):
+def save_config(sessao: str, config: dict):
     os.makedirs("data", exist_ok=True)
-    with open(DATA_FILE, "w", encoding="utf-8") as f:
+    with open(get_data_file(sessao), "w", encoding="utf-8") as f:
         json.dump(config, f, ensure_ascii=False, indent=2)
 
-async def broadcast(message: dict):
-    for ws in connected_clients[:]:
-        try:
-            await ws.send_json(message)
-        except:
-            connected_clients.remove(ws)
+async def broadcast(sessao: str, message: dict):
+    if sessao in connected_clients:
+        for ws in connected_clients[sessao][:]:
+            try:
+                await ws.send_json(message)
+            except:
+                connected_clients[sessao].remove(ws)
 
-# ── WebSocket para QR code ────────────────────────────────────────────────────
-
-@app.websocket("/ws")
-async def websocket_endpoint(websocket: WebSocket):
+# ── WebSocket para QR code (ISOLADO POR SESSÃO) ───────────────────────────────
+@app.websocket("/ws/{sessao}")
+async def websocket_endpoint(websocket: WebSocket, sessao: str):
     await websocket.accept()
-    connected_clients.append(websocket)
+    if sessao not in connected_clients:
+        connected_clients[sessao] = []
+    connected_clients[sessao].append(websocket)
     try:
         while True:
             data = await websocket.receive_text()
             message = json.loads(data)
             if message.get("type") in ["qr", "bot_status"]:
-                await broadcast(message)
+                await broadcast(sessao, message)
     except WebSocketDisconnect:
-        if websocket in connected_clients:
-            connected_clients.remove(websocket)
+        if websocket in connected_clients[sessao]:
+            connected_clients[sessao].remove(websocket)
     except Exception as e:
-        print(f"Erro no WebSocket: {e}")
-        if websocket in connected_clients:
-            connected_clients.remove(websocket)
+        print(f"Erro no WebSocket da sessão {sessao}: {e}")
+        if websocket in connected_clients[sessao]:
+            connected_clients[sessao].remove(websocket)
 
-# ── API Routes ────────────────────────────────────────────────────────────────
-
+# ── API Routes (COM PARÂMETRO SESSÃO) ─────────────────────────────────────────
 @app.get("/api/config")
-def get_config():
-    return load_config()
+def get_config(sessao: str = "default"):
+    return load_config(sessao)
 
 @app.post("/api/config")
-def update_config(config: BotConfig):
-    save_config(config.model_dump())
+def update_config(config: BotConfig, sessao: str = "default"):
+    save_config(sessao, config.model_dump())
     return {"status": "ok", "message": "Configuração salva com sucesso!"}
 
 @app.post("/api/bot/start")
-async def start_bot():
-    global BOT_PROCESS
-    if BOT_PROCESS and BOT_PROCESS.poll() is None:
+async def start_bot(sessao: str = "default"):
+    if sessao in BOT_PROCESSES and BOT_PROCESSES[sessao].poll() is None:
         return {"status": "already_running"}
-    generate_bot_js()
+    generate_bot_js(sessao)
     try:
-        BOT_PROCESS = subprocess.Popen(
-            ["node", "bot.js"],
+        process = subprocess.Popen(
+            ["node", f"bot_{sessao}.js"],
             stdout=subprocess.PIPE,
             stderr=subprocess.STDOUT,
             text=True,
             bufsize=1
         )
-        threading.Thread(target=read_bot_output, daemon=True).start()
+        BOT_PROCESSES[sessao] = process
+        threading.Thread(target=read_bot_output, args=(sessao,), daemon=True).start()
         return {"status": "started"}
     except FileNotFoundError:
         return {"status": "error", "message": "Node.js não encontrado."}
 
 @app.post("/api/bot/stop")
-async def stop_bot():
-    global BOT_PROCESS
-    if BOT_PROCESS:
-        BOT_PROCESS.terminate()
-        BOT_PROCESS = None
-        await broadcast({"type": "bot_status", "status": "stopped"})
+async def stop_bot(sessao: str = "default"):
+    if sessao in BOT_PROCESSES and BOT_PROCESSES[sessao]:
+        BOT_PROCESSES[sessao].terminate()
+        del BOT_PROCESSES[sessao]
+        await broadcast(sessao, {"type": "bot_status", "status": "stopped"})
         return {"status": "stopped"}
     return {"status": "not_running"}
 
 @app.get("/api/bot/status")
-def bot_status():
-    global BOT_PROCESS
-    if BOT_PROCESS and BOT_PROCESS.poll() is None:
+def bot_status(sessao: str = "default"):
+    if sessao in BOT_PROCESSES and BOT_PROCESSES[sessao].poll() is None:
         return {"status": "running"}
     return {"status": "stopped"}
 
 
-# ── License API ───────────────────────────────────────────────────────────────
-
-@app.get("/api/license/status")
-def license_status():
-    machine_id = get_machine_id()
-    licensed = check_license()
-    return {"licensed": licensed, "machine_id": machine_id}
-
-
-@app.post("/api/license/activate")
-def license_activate(body: ActivationRequest):
-    machine_id = get_machine_id()
-    if not verify_activation_code(machine_id, body.code):
-        raise HTTPException(status_code=400, detail="Código de ativação inválido.")
-    save_license(machine_id, body.code)
-    return {"status": "ok", "message": "Licença ativada com sucesso!"}
-
-# ── Bot JS Generator ──────────────────────────────────────────────────────────
-
-def generate_bot_js():
-    config = load_config()
+# ── Bot JS Generator (ISOLADO POR SESSÃO) ─────────────────────────────────────
+def generate_bot_js(sessao: str):
+    config = load_config(sessao)
     menu_json = json.dumps(config["menu"], ensure_ascii=False)
     welcome = config["welcome_message"].replace("`", "\\`").replace('"', '\\"')
     
@@ -241,18 +135,18 @@ def generate_bot_js():
 const qrcode = require('qrcode');
 const WebSocket = require('ws');
 
-const ws = new WebSocket('ws://127.0.0.1:8000/ws');
+const ws = new WebSocket('ws://127.0.0.1:8000/ws/{sessao}');
 const menu = {menu_json};
 const userState = {{}}; 
 
 const client = new Client({{
   authStrategy: new LocalAuth({{
-    clientId: "client-one",
-    dataPath: "./.wwebjs_auth"
+    clientId: "client-{sessao}",
+    dataPath: "./.wwebjs_auth_{sessao}"
   }}),
-  authTimeoutMs: 0, // Desativa o timeout de autenticação
+  authTimeoutMs: 0,
   puppeteer: {{ 
-    executablePath: '/usr/bin/google-chrome-stable', // <--- FORÇA O CHROME DO SISTEMA
+    executablePath: '/usr/bin/google-chrome-stable',
     headless: true,
     protocolTimeout: 0,
     args: [
@@ -270,17 +164,15 @@ const client = new Client({{
 client.on('qr', async (qr) => {{
   try {{
     const qrDataUrl = await qrcode.toDataURL(qr);
-    const msg = JSON.stringify({{ type: 'qr', data: qrDataUrl }});
-    if (ws.readyState === WebSocket.OPEN) ws.send(msg);
+    if (ws.readyState === WebSocket.OPEN) ws.send(JSON.stringify({{ type: 'qr', data: qrDataUrl }}));
   }} catch (err) {{
     console.error('Erro no QR:', err);
   }}
 }});
 
 client.on('ready', () => {{
-  console.log('Bot conectado!');
-  const msg = JSON.stringify({{ type: 'bot_status', status: 'connected' }});
-  if (ws.readyState === WebSocket.OPEN) ws.send(msg);
+  console.log('Bot conectado (Sessao: {sessao})!');
+  if (ws.readyState === WebSocket.OPEN) ws.send(JSON.stringify({{ type: 'bot_status', status: 'connected' }}));
 }});
 
 function buildMenuText(items) {{
@@ -303,23 +195,18 @@ client.on('message', async (msg) => {{
       return await client.sendMessage(from, text);
     }};
 
-    // RESET: Se o usuário digitar 'menu' ou '0'
     if (body.toLowerCase() === 'menu' || body === '0') {{
       userState[from] = {{ path: [], active: true }};
-      const menuText = buildMenuText(menu);
-      await send(`{welcome}\\n\\n${{menuText}}\\n\\n_Digite o número da opção desejada._`);
+      await send(`{welcome}\\n\\n${{buildMenuText(menu)}}\\n\\n_Digite o número da opção desejada._`);
       return;
     }}
 
-    // INÍCIO: Se não houver estado ativo, inicia o bot
     if (!userState[from] || !userState[from].active) {{
       userState[from] = {{ path: [], active: true }};
-      const menuText = buildMenuText(menu);
-      await send(`{welcome}\\n\\n${{menuText}}\\n\\n_Como posso ajudar? Digite uma opção:_`);
+      await send(`{welcome}\\n\\n${{buildMenuText(menu)}}\\n\\n_Como posso ajudar? Digite uma opção:_`);
       return;
     }}
 
-    // NAVEGAÇÃO: Só entra aqui se o estado estiver ativo
     const choice = parseInt(body) - 1;
     if (isNaN(choice) || choice < 0) {{
       await send('❌ Opção inválida. Digite o número ou *menu* para reiniciar.');
@@ -343,11 +230,10 @@ client.on('message', async (msg) => {{
     if (item.final_response || !item.children || item.children.length === 0) {{
       await send(item.final_response || 'Obrigado pelo contato!');
       await send('_Digite *menu* para voltar ao início._');
-      userState[from].active = false; // Desativa para a próxima msg reiniciar o menu
+      userState[from].active = false;
     }} else {{
-      userState[from].path = targetLevel; // Atualiza o caminho para o próximo nível
-      const subMenu = buildMenuText(item.children);
-      await send(`*${{item.text}}*\\n\\n${{subMenu}}\\n\\n_Escolha uma opção:_`);
+      userState[from].path = targetLevel;
+      await send(`*${{item.text}}*\\n\\n${{buildMenuText(item.children)}}\\n\\n_Escolha uma opção:_`);
     }}
 
   }} catch (error) {{
@@ -357,15 +243,14 @@ client.on('message', async (msg) => {{
 
 client.initialize();
 """
-    with open("bot.js", "w", encoding="utf-8") as f:
+    with open(f"bot_{sessao}.js", "w", encoding="utf-8") as f:
         f.write(bot_code)
         
-def read_bot_output():
-    global BOT_PROCESS
-    if not BOT_PROCESS:
-        return
-    for line in BOT_PROCESS.stdout:
-        print(f"[BOT] {line.strip()}")
+def read_bot_output(sessao: str):
+    process = BOT_PROCESSES.get(sessao)
+    if not process: return
+    for line in process.stdout:
+        print(f"[BOT {sessao}] {line.strip()}")
 
 @app.get("/", response_class=HTMLResponse)
 def root():
@@ -376,6 +261,4 @@ app.mount("/static", StaticFiles(directory="static"), name="static")
 if __name__ == "__main__":
     import uvicorn
     os.makedirs("data", exist_ok=True)
-    if not os.path.exists(DATA_FILE):
-        save_config(load_config())
     uvicorn.run(app, host="0.0.0.0", port=8000, reload=False)

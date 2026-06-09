@@ -993,7 +993,10 @@
 </div>
 
 <script>
-// ── State ──────────────────────────────────────────────────────────────────
+// ── State & Multi-tenant ───────────────────────────────────────────────────
+const urlParams = new URLSearchParams(window.location.search);
+const sessao = urlParams.get('sessao') || 'default';
+
 let config = { business_name: '', business_logo: '', welcome_message: '', menu: [] };
 let ws = null;
 let botStatus = 'stopped';
@@ -1019,7 +1022,8 @@ function showToast(msg, type = 'success') {
 // ── WebSocket ──────────────────────────────────────────────────────────────
 function connectWS() {
   const proto = location.protocol === 'https:' ? 'wss' : 'ws';
-  ws = new WebSocket(`${proto}://${location.host}/ws`);
+  // Agora conecta no canal privado da sessão atual
+  ws = new WebSocket(`${proto}://${location.host}/ws/${sessao}`);
 
   ws.onmessage = (e) => {
     const data = JSON.parse(e.data);
@@ -1081,7 +1085,7 @@ async function startBot() {
   document.getElementById('qrLoading').style.display = 'flex';
   document.getElementById('btnStart').disabled = true;
 
-  const r = await fetch('/api/bot/start', { method: 'POST' });
+  const r = await fetch(`/api/bot/start?sessao=${sessao}`, { method: 'POST' });
   const d = await r.json();
 
   if (d.status === 'error') {
@@ -1098,14 +1102,14 @@ async function startBot() {
 }
 
 async function stopBot() {
-  await fetch('/api/bot/stop', { method: 'POST' });
+  await fetch(`/api/bot/stop?sessao=${sessao}`, { method: 'POST' });
   updateBotStatus('stopped');
   document.getElementById('btnStart').disabled = false;
 }
 
 // ── Config Load/Save ──────────────────────────────────────────────────────
 async function loadConfig() {
-  const r = await fetch('/api/config');
+  const r = await fetch(`/api/config?sessao=${sessao}`);
   config = await r.json();
 
   document.getElementById('businessName').value = config.business_name || '';
@@ -1125,7 +1129,7 @@ async function saveConfig() {
   config.business_name = document.getElementById('businessName').value;
   config.welcome_message = document.getElementById('welcomeMessage').value;
 
-  const r = await fetch('/api/config', {
+  const r = await fetch(`/api/config?sessao=${sessao}`, {
     method: 'POST',
     headers: { 'Content-Type': 'application/json' },
     body: JSON.stringify(config)
@@ -1206,7 +1210,6 @@ function createRootItem(item, index) {
     </div>
   `;
 
-  // Render children
   const childrenContainer = div.querySelector(`#children-${index}`);
   (item.children || []).forEach((child, ci) => {
     childrenContainer.appendChild(createChildItem(child, index, ci));
@@ -1259,7 +1262,6 @@ function addRootItem() {
     final_response: ''
   });
   renderMenuTree();
-  // Open last item
   const items = document.querySelectorAll('.menu-item');
   if (items.length) items[items.length-1].classList.add('open');
 }
@@ -1279,7 +1281,6 @@ function addChild(parentIndex) {
   });
   config.menu[parentIndex].final_response = null;
   renderMenuTree();
-  // Reopen parent
   const items = document.querySelectorAll('.menu-item');
   if (items[parentIndex]) items[parentIndex].classList.add('open');
 }
@@ -1322,7 +1323,7 @@ function escapeHtml(str) {
 // ── License ───────────────────────────────────────────────────────────────
 async function checkLicenseOnLoad() {
   try {
-    const r = await fetch('/api/license/status');
+    const r = await fetch('/api/license/status'); // Licença não precisa de sessão (é por máquina)
     const d = await r.json();
     if (!d.licensed) {
       document.getElementById('machineIdText').textContent = d.machine_id || '—';
@@ -1380,12 +1381,12 @@ async function activateLicense() {
 }
 
 // ── Init ──────────────────────────────────────────────────────────────────
-checkLicenseOnLoad();
+//checkLicenseOnLoad();
 connectWS();
 loadConfig();
 
 // Check initial status
-fetch('/api/bot/status').then(r => r.json()).then(d => {
+fetch(`/api/bot/status?sessao=${sessao}`).then(r => r.json()).then(d => {
   if (d.status === 'running') updateBotStatus('waiting_qr');
 });
 </script>
