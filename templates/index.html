@@ -1022,8 +1022,8 @@ function showToast(msg, type = 'success') {
 // ── WebSocket ──────────────────────────────────────────────────────────────
 function connectWS() {
   const proto = location.protocol === 'https:' ? 'wss' : 'ws';
-  // Agora conecta no canal privado da sessão atual
-  ws = new WebSocket(`${proto}://${location.host}/ws/${sessao}`);
+  // CORREÇÃO: Adicionado o /bot-interno no caminho do WebSocket
+  ws = new WebSocket(`${proto}://${location.host}/bot-interno/ws/${sessao}`);
 
   ws.onmessage = (e) => {
     const data = JSON.parse(e.data);
@@ -1085,7 +1085,8 @@ async function startBot() {
   document.getElementById('qrLoading').style.display = 'flex';
   document.getElementById('btnStart').disabled = true;
 
-  const r = await fetch(`/api/bot/start?sessao=${sessao}`, { method: 'POST' });
+  // CORREÇÃO: Adicionado o /bot-interno na API
+  const r = await fetch(`/bot-interno/api/bot/start?sessao=${sessao}`, { method: 'POST' });
   const d = await r.json();
 
   if (d.status === 'error') {
@@ -1102,14 +1103,16 @@ async function startBot() {
 }
 
 async function stopBot() {
-  await fetch(`/api/bot/stop?sessao=${sessao}`, { method: 'POST' });
+  // CORREÇÃO: Adicionado o /bot-interno na API
+  await fetch(`/bot-interno/api/bot/stop?sessao=${sessao}`, { method: 'POST' });
   updateBotStatus('stopped');
   document.getElementById('btnStart').disabled = false;
 }
 
 // ── Config Load/Save ──────────────────────────────────────────────────────
 async function loadConfig() {
-  const r = await fetch(`/api/config?sessao=${sessao}`);
+  // CORREÇÃO: Adicionado o /bot-interno na API
+  const r = await fetch(`/bot-interno/api/config?sessao=${sessao}`);
   config = await r.json();
 
   document.getElementById('businessName').value = config.business_name || '';
@@ -1129,7 +1132,8 @@ async function saveConfig() {
   config.business_name = document.getElementById('businessName').value;
   config.welcome_message = document.getElementById('welcomeMessage').value;
 
-  const r = await fetch(`/api/config?sessao=${sessao}`, {
+  // CORREÇÃO: Adicionado o /bot-interno na API
+  const r = await fetch(`/bot-interno/api/config?sessao=${sessao}`, {
     method: 'POST',
     headers: { 'Content-Type': 'application/json' },
     body: JSON.stringify(config)
@@ -1320,73 +1324,13 @@ function escapeHtml(str) {
   return (str || '').replace(/&/g,'&amp;').replace(/</g,'&lt;').replace(/>/g,'&gt;').replace(/"/g,'&quot;');
 }
 
-// ── License ───────────────────────────────────────────────────────────────
-async function checkLicenseOnLoad() {
-  try {
-    const r = await fetch('/api/license/status'); // Licença não precisa de sessão (é por máquina)
-    const d = await r.json();
-    if (!d.licensed) {
-      document.getElementById('machineIdText').textContent = d.machine_id || '—';
-      document.getElementById('licenseOverlay').classList.remove('hidden');
-    }
-  } catch (e) {
-    console.error('Erro ao verificar licença:', e);
-  }
-}
-
-function copyMachineId() {
-  const text = document.getElementById('machineIdText').textContent;
-  navigator.clipboard.writeText(text).then(() => {
-    document.getElementById('copyHint').textContent = '✓ Copiado!';
-    setTimeout(() => { document.getElementById('copyHint').textContent = '📋 Copiar'; }, 2000);
-  });
-}
-
-function formatLicenseInput(el) {
-  let v = el.value.replace(/[^A-Za-z0-9]/g, '').toUpperCase();
-  let out = '';
-  for (let i = 0; i < Math.min(v.length, 16); i++) {
-    if (i > 0 && i % 4 === 0) out += '-';
-    out += v[i];
-  }
-  el.value = out;
-}
-
-async function activateLicense() {
-  const code = document.getElementById('activationCodeInput').value.trim();
-  const errEl = document.getElementById('licenseError');
-  errEl.textContent = '';
-
-  if (code.length < 19) {
-    errEl.textContent = 'Informe o código completo no formato XXXX-XXXX-XXXX-XXXX.';
-    return;
-  }
-
-  try {
-    const r = await fetch('/api/license/activate', {
-      method: 'POST',
-      headers: { 'Content-Type': 'application/json' },
-      body: JSON.stringify({ code })
-    });
-    const d = await r.json();
-    if (r.ok) {
-      document.getElementById('licenseOverlay').classList.add('hidden');
-      showToast('Licença ativada com sucesso!', 'success');
-    } else {
-      errEl.textContent = d.detail || 'Código inválido.';
-    }
-  } catch (e) {
-    errEl.textContent = 'Erro ao conectar com o servidor.';
-  }
-}
-
 // ── Init ──────────────────────────────────────────────────────────────────
-//checkLicenseOnLoad();
 connectWS();
 loadConfig();
 
 // Check initial status
-fetch(`/api/bot/status?sessao=${sessao}`).then(r => r.json()).then(d => {
+// CORREÇÃO: Adicionado o /bot-interno na API
+fetch(`/bot-interno/api/bot/status?sessao=${sessao}`).then(r => r.json()).then(d => {
   if (d.status === 'running') updateBotStatus('waiting_qr');
 });
 </script>
