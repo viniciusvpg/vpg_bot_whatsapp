@@ -12,6 +12,8 @@ app = FastAPI(title="VPG Atendimento Whatsapp")
 
 # DICIONÁRIOS MULTI-TENANT (Isolamento de Sessões)
 BOT_PROCESSES: Dict[str, subprocess.Popen] = {}
+BOT_STATES: Dict[str, str] = {}
+LAST_QR: Dict[str, str] = {}
 connected_clients: Dict[str, List[WebSocket]] = {}
 
 # ── Modelos ──────────────────────────────────────────────────────────────────
@@ -70,6 +72,14 @@ async def websocket_endpoint(websocket: WebSocket, sessao: str):
         while True:
             data = await websocket.receive_text()
             message = json.loads(data)
+            
+            # SALVANDO NA MEMÓRIA DO SERVIDOR
+            if message.get("type") == "bot_status":
+                BOT_STATES[sessao] = message.get("status")
+            elif message.get("type") == "qr":
+                BOT_STATES[sessao] = "waiting_qr"
+                LAST_QR[sessao] = message.get("data")
+                
             if message.get("type") in ["qr", "bot_status"]:
                 await broadcast(sessao, message)
     except WebSocketDisconnect:
@@ -104,6 +114,7 @@ async def start_bot(sessao: str = "default"):
             bufsize=1
         )
         BOT_PROCESSES[sessao] = process
+        BOT_STATES[sessao] = "starting"
         threading.Thread(target=read_bot_output, args=(sessao,), daemon=True).start()
         return {"status": "started"}
     except FileNotFoundError:
@@ -114,6 +125,7 @@ async def stop_bot(sessao: str = "default"):
     if sessao in BOT_PROCESSES and BOT_PROCESSES[sessao]:
         BOT_PROCESSES[sessao].terminate()
         del BOT_PROCESSES[sessao]
+        BOT_STATES[sessao] = "stopped"
         await broadcast(sessao, {"type": "bot_status", "status": "stopped"})
         return {"status": "stopped"}
     return {"status": "not_running"}
@@ -121,7 +133,9 @@ async def stop_bot(sessao: str = "default"):
 @app.get("/api/bot/status")
 def bot_status(sessao: str = "default"):
     if sessao in BOT_PROCESSES and BOT_PROCESSES[sessao].poll() is None:
-        return {"status": "running"}
+        state = BOT_STATES.get(sessao, "starting")
+        qr_data = LAST_QR.get(sessao, "") if state == "waiting_qr" else ""
+        return {"status": state, "qr": qr_data}
     return {"status": "stopped"}
 
 

@@ -1362,9 +1362,17 @@ connectWS();
 loadConfig();
 
 // Check initial status
-// CORREÇÃO: Adicionado o /bot-interno na API
 fetch(`/bot-interno/api/bot/status?sessao=${sessao}`).then(r => r.json()).then(d => {
-  if (d.status === 'running') updateBotStatus('waiting_qr');
+  if (d.status === 'connected') {
+    updateBotStatus('connected');
+  } else if (d.status === 'waiting_qr') {
+    if (d.qr) showQR(d.qr);
+    else updateBotStatus('waiting_qr');
+  } else if (d.status === 'starting' || d.status === 'running') {
+    updateBotStatus('waiting_qr');
+  } else {
+    updateBotStatus('stopped');
+  }
 });
 </script>
 </body>
