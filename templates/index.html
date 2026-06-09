@@ -887,6 +887,11 @@
       <button class="btn btn-primary" id="btnStart" onclick="startBot()">
         ▶ Iniciar Bot
       </button>
+      
+      <button class="btn" id="btnRestart" onclick="restartBot()" style="display:none; background-color: var(--warning); color: #fff; border: none;">
+        ↻ Reiniciar Bot
+      </button>
+
       <button class="btn btn-danger" id="btnStop" onclick="stopBot()" style="display:none">
         ■ Parar Bot
       </button>
@@ -1051,6 +1056,7 @@ function updateBotStatus(status) {
   const text = document.getElementById('statusText');
   const start = document.getElementById('btnStart');
   const stop = document.getElementById('btnStop');
+  const restart = document.getElementById('btnRestart'); // Puxa o botão novo
 
   dot.className = 'status-dot';
 
@@ -1061,13 +1067,18 @@ function updateBotStatus(status) {
     document.getElementById('qrLoading').style.display = 'none';
     document.getElementById('qrImage').style.display = 'none';
     document.getElementById('qrConnected').style.display = 'flex';
+    
     start.style.display = 'none';
+    restart.style.display = 'inline-flex'; // Mostra o botão
     stop.style.display = 'inline-flex';
+    
     showToast('WhatsApp conectado com sucesso!', 'success');
   } else if (status === 'waiting_qr' || status === 'authenticated') {
     dot.classList.add('connecting');
     text.textContent = status === 'authenticated' ? 'Autenticando...' : 'Aguardando QR';
+    
     start.style.display = 'none';
+    restart.style.display = 'inline-flex'; // Mostra o botão
     stop.style.display = 'inline-flex';
   } else if (status === 'stopped') {
     text.textContent = 'Desconectado';
@@ -1075,7 +1086,9 @@ function updateBotStatus(status) {
     document.getElementById('qrLoading').style.display = 'none';
     document.getElementById('qrImage').style.display = 'none';
     document.getElementById('qrConnected').style.display = 'none';
+    
     start.style.display = 'inline-flex';
+    restart.style.display = 'none'; // Esconde o botão
     stop.style.display = 'none';
   }
 }
@@ -1322,6 +1335,26 @@ function updateChildFinalResponse(parentIndex, childIndex, val) {
 
 function escapeHtml(str) {
   return (str || '').replace(/&/g,'&amp;').replace(/</g,'&lt;').replace(/>/g,'&gt;').replace(/"/g,'&quot;');
+}
+
+async function restartBot() {
+  // Bloqueia os botões para o cliente não clicar várias vezes
+  document.getElementById('btnRestart').disabled = true;
+  document.getElementById('btnStop').disabled = true;
+  showToast('Reiniciando robô...', 'success');
+
+  // 1. Manda o comando de PARAR
+  await fetch(`/bot-interno/api/bot/stop?sessao=${sessao}`, { method: 'POST' });
+  
+  // 2. Espera 1.5 segundos para o Linux encerrar o processo com segurança
+  setTimeout(async () => {
+    // 3. Manda o comando de INICIAR
+    await startBot();
+    
+    // Libera os botões novamente
+    document.getElementById('btnRestart').disabled = false;
+    document.getElementById('btnStop').disabled = false;
+  }, 1500);
 }
 
 // ── Init ──────────────────────────────────────────────────────────────────
