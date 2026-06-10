@@ -30,7 +30,7 @@ class BotConfig(BaseModel):
     business_logo: Optional[str] = None
     welcome_message: str
     menu: List[MenuItem]
-
+    show_products: bool = False  # <-- NOVA CHAVE AQUI
 
 # ── Helpers (ISOLADOS POR SESSÃO) ─────────────────────────────────────────────
 def get_data_file(sessao: str) -> str:
@@ -45,7 +45,8 @@ def load_config(sessao: str) -> dict:
         "business_name": "Meu Negócio",
         "business_logo": "",
         "welcome_message": "Olá! Bem-vindo. Como posso ajudar?",
-        "menu": []
+        "menu": [],
+        "show_products": False 
     }
 
 def save_config(sessao: str, config: dict):
