@@ -164,7 +164,6 @@ const enableScheduling = {enable_scheduling};
 const daysAhead = {days_ahead};
 
 // Mock de Integração com o seu Banco de Dados
-// No futuro, o Node fará uma requisição HTTP para o seu Flask buscar esses dados
 const mockHorarios = ['09:00', '10:00', '14:00', '15:30', '17:00'];
 const mockServicos = ['Corte Social', 'Barba Completa', 'Combo Corte + Barba', 'Platinado'];
 
@@ -299,8 +298,8 @@ client.on('message', async (msg) => {{
         await sendFunc(resumo);
         userState[userFrom].active = false;
         
-        // AQUI VOCÊ FARÁ UM POST PARA O SEU FLASK:
-        // axios.post('https://seu-painel.com/api/registrar-agendamento', { data: s.selectedDay, hora: s.selectedTime, ... })
+        // POST PARA O SEU FLASK CORRIGIDO AQUI
+        // axios.post('https://seu-painel.com/api/registrar-agendamento', {{ data: s.selectedDay, hora: s.selectedTime }});
     }}
 
     // ==========================================
