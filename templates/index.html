@@ -9,50 +9,122 @@
 <link rel="stylesheet" href="https://cdnjs.cloudflare.com/ajax/libs/font-awesome/6.4.0/css/all.min.css">
 <style>
   :root {
-    --green: #25D366; --green-dark: #128C7E; --bg: #0d1117; --surface: #161b22; 
-    --surface2: #1c2330; --border: #30363d; --text: #e6edf3; --text-muted: #8b949e; 
-    --danger: #f85149; --warning: #d29922; --radius: 12px;
+    --green: #25D366;
+    --green-dark: #128C7E;
+    --green-light: #DCF8C6;
+    --bg: #0d1117;
+    --surface: #161b22;
+    --surface2: #1c2330;
+    --border: #30363d;
+    --text: #e6edf3;
+    --text-muted: #8b949e;
+    --accent: #25D366;
+    --danger: #f85149;
+    --warning: #d29922;
+    --radius: 12px;
   }
-  * { box-sizing: border-box; margin: 0; padding: 0; }
-  body { font-family: 'DM Sans', sans-serif; background: var(--bg); color: var(--text); min-height: 100vh; display: flex; flex-direction: column; }
 
-  /* Header & Tabs */
-  header { background: var(--surface); border-bottom: 1px solid var(--border); padding: 0 24px; display: flex; align-items: center; justify-content: space-between; height: 64px; }
+  * { box-sizing: border-box; margin: 0; padding: 0; }
+
+  body {
+    font-family: 'DM Sans', sans-serif;
+    background: var(--bg);
+    color: var(--text);
+    min-height: 100vh;
+    display: flex;
+    flex-direction: column;
+  }
+
+  /* ── Header ── */
+  header {
+    background: var(--surface);
+    border-bottom: 1px solid var(--border);
+    padding: 0 24px;
+    display: flex;
+    align-items: center;
+    justify-content: space-between;
+    height: 64px;
+    position: sticky;
+    top: 0;
+    z-index: 100;
+  }
+
   .header-brand { display: flex; align-items: center; gap: 12px; }
-  .header-brand .logo-icon { width: 36px; height: 36px; background: var(--green); border-radius: 10px; display: flex; align-items: center; justify-content: center; font-size: 20px; }
-  .header-brand h1 { font-family: 'Syne', sans-serif; font-size: 18px; font-weight: 700; }
-  .bot-status-pill { display: flex; align-items: center; gap: 8px; padding: 6px 14px; border-radius: 999px; border: 1px solid var(--border); font-size: 13px; font-weight: 500; background: var(--surface2); }
-  .status-dot { width: 8px; height: 8px; border-radius: 50%; background: var(--text-muted); }
+  .header-brand .logo-icon {
+    width: 36px; height: 36px; background: var(--green); border-radius: 10px;
+    display: flex; align-items: center; justify-content: center; font-size: 20px;
+  }
+  .header-brand h1 { font-family: 'Syne', sans-serif; font-size: 18px; font-weight: 700; color: var(--text); }
+
+  .bot-status-pill {
+    display: flex; align-items: center; gap: 8px; padding: 6px 14px;
+    border-radius: 999px; border: 1px solid var(--border); font-size: 13px; font-weight: 500;
+    background: var(--surface2); transition: all 0.3s;
+  }
+
+  .status-dot { width: 8px; height: 8px; border-radius: 50%; background: var(--text-muted); transition: all 0.3s; }
   .status-dot.connected { background: var(--green); box-shadow: 0 0 8px var(--green); animation: pulse 2s infinite; }
   .status-dot.connecting { background: var(--warning); animation: pulse 1s infinite; }
+
   @keyframes pulse { 0%, 100% { opacity: 1; } 50% { opacity: 0.4; } }
 
+  /* ── Tabs ── */
   .tabs-nav { display: flex; background: var(--surface); border-bottom: 1px solid var(--border); padding: 0 24px; gap: 4px; }
-  .tab-btn { padding: 14px 20px; background: none; border: none; color: var(--text-muted); font-size: 14px; font-weight: 500; cursor: pointer; border-bottom: 2px solid transparent; display: flex; align-items: center; gap: 8px; margin-bottom: -1px; transition: 0.2s; }
+  .tab-btn {
+    padding: 14px 20px; background: none; border: none; color: var(--text-muted); font-family: 'DM Sans', sans-serif; font-size: 14px;
+    font-weight: 500; cursor: pointer; border-bottom: 2px solid transparent; transition: all 0.2s; display: flex; align-items: center; gap: 8px; margin-bottom: -1px;
+  }
   .tab-btn:hover { color: var(--text); }
   .tab-btn.active { color: var(--green); border-bottom-color: var(--green); }
   .tab-content { display: none; flex: 1; }
   .tab-content.active { display: flex; }
 
-  /* Base Elements */
-  .btn { padding: 11px 24px; border-radius: 10px; border: none; font-size: 14px; font-weight: 500; cursor: pointer; display: inline-flex; align-items: center; justify-content: center; gap: 8px; font-family: 'DM Sans', sans-serif; }
-  .btn-primary { background: var(--green); color: #000; font-weight: 700; }
-  .btn-primary:hover { background: #1ebe5a; }
+  /* ── Tab 1: Conexão ── */
+  #tab-connection { flex-direction: column; align-items: center; justify-content: center; padding: 40px 24px; gap: 32px; }
+  .business-card { background: var(--surface); border: 1px solid var(--border); border-radius: 20px; padding: 32px; text-align: center; max-width: 420px; width: 100%; }
+  .business-logo-wrap {
+    width: 80px; height: 80px; border-radius: 20px; background: linear-gradient(135deg, var(--green-dark), var(--green));
+    display: flex; align-items: center; justify-content: center; font-size: 38px; margin: 0 auto 16px; position: relative; overflow: hidden; cursor: pointer; transition: transform 0.2s;
+  }
+  .business-logo-wrap:hover { transform: scale(1.05); }
+  .business-logo-wrap img { width: 100%; height: 100%; object-fit: cover; border-radius: 20px; }
+  .logo-overlay { position: absolute; inset: 0; background: rgba(0,0,0,0.5); display: none; align-items: center; justify-content: center; border-radius: 20px; font-size: 20px; }
+  .business-logo-wrap:hover .logo-overlay { display: flex; }
+  .business-name-display { font-family: 'Syne', sans-serif; font-size: 22px; font-weight: 800; margin-bottom: 4px; }
+  .business-subtitle { color: var(--text-muted); font-size: 13px; }
+
+  .qr-panel { background: var(--surface); border: 1px solid var(--border); border-radius: 20px; padding: 32px; text-align: center; max-width: 420px; width: 100%; }
+  .qr-panel h2 { font-family: 'Syne', sans-serif; font-size: 18px; font-weight: 700; margin-bottom: 8px; }
+  .qr-panel p { color: var(--text-muted); font-size: 13px; margin-bottom: 24px; line-height: 1.5; }
+  .qr-box { width: 220px; height: 220px; margin: 0 auto 24px; background: white; border-radius: 16px; display: flex; align-items: center; justify-content: center; overflow: hidden; position: relative; }
+  .qr-box img { width: 100%; height: 100%; object-fit: contain; }
+  .qr-placeholder, .qr-connected { display: flex; flex-direction: column; align-items: center; gap: 12px; color: #aaa; font-size: 13px; }
+  .qr-placeholder svg { opacity: 0.3; }
+  .check-circle { width: 64px; height: 64px; background: var(--green); border-radius: 50%; display: flex; align-items: center; justify-content: center; font-size: 32px; animation: pop 0.4s cubic-bezier(0.34,1.56,0.64,1); }
+  @keyframes pop { from { transform: scale(0); opacity: 0; } to { transform: scale(1); opacity: 1; } }
+
+  .btn { padding: 11px 24px; border-radius: 10px; border: none; font-family: 'DM Sans', sans-serif; font-size: 14px; font-weight: 500; cursor: pointer; transition: all 0.2s; display: inline-flex; align-items: center; justify-content: center; gap: 8px; }
+  .btn-primary { background: var(--green); color: #000; font-weight: 700;}
+  .btn-primary:hover { background: #1ebe5a; transform: translateY(-1px); }
+  .btn-primary:disabled { opacity: 0.5; cursor: not-allowed; transform: none; }
   .btn-danger { background: rgba(248,81,73,0.15); color: var(--danger); border: 1px solid rgba(248,81,73,0.3); }
+  .btn-danger:hover { background: rgba(248,81,73,0.25); }
   .btn-secondary { background: var(--surface2); color: var(--text); border: 1px solid var(--border); }
   .btn-secondary:hover { background: var(--border); }
+  .btn-sm { padding: 7px 14px; font-size: 13px; }
 
-  /* Settings Area */
+  /* ── Tab 2: Configurações ── */
   #tab-settings { flex-direction: column; max-width: 900px; margin: 0 auto; width: 100%; padding: 32px 24px; gap: 24px; }
   .settings-section { background: var(--surface); border: 1px solid var(--border); border-radius: var(--radius); padding: 24px; }
   .section-header { display: flex; align-items: center; justify-content: space-between; margin-bottom: 20px; }
   .section-title { font-family: 'Syne', sans-serif; font-size: 15px; font-weight: 700; display: flex; align-items: center; gap: 8px; }
   .form-group { margin-bottom: 16px; }
   label { display: block; font-size: 13px; font-weight: 500; color: var(--text-muted); margin-bottom: 6px; text-transform: uppercase; letter-spacing: 0.5px; }
-  input[type="text"], input[type="number"], textarea { width: 100%; background: var(--bg); border: 1px solid var(--border); border-radius: 8px; padding: 10px 14px; color: var(--text); font-family: 'DM Sans', sans-serif; font-size: 14px; outline: none; }
-  input:focus, textarea:focus { border-color: var(--green); }
-  
-  /* Toggles & Badges */
+  input[type="text"], textarea { width: 100%; background: var(--bg); border: 1px solid var(--border); border-radius: 8px; padding: 10px 14px; color: var(--text); font-family: 'DM Sans', sans-serif; font-size: 14px; outline: none; }
+  input[type="text"]:focus, textarea:focus { border-color: var(--green); }
+  textarea { resize: vertical; min-height: 80px; }
+
+  /* Toggle Switch para Produtos */
   .switch { position: relative; display: inline-block; width: 46px; height: 24px; }
   .switch input { opacity: 0; width: 0; height: 0; }
   .slider { position: absolute; cursor: pointer; top: 0; left: 0; right: 0; bottom: 0; background-color: var(--surface2); border: 1px solid var(--border); transition: .4s; border-radius: 24px; }
@@ -60,44 +132,64 @@
   input:checked + .slider { background-color: var(--green); border-color: var(--green); }
   input:checked + .slider:before { transform: translateX(22px); }
 
-  .products-list, .schedule-preview { display: flex; flex-wrap: wrap; gap: 10px; margin-top: 12px; }
-  .product-badge { background: rgba(37,211,102,0.1); border: 1px solid rgba(37,211,102,0.3); color: var(--green); padding: 6px 14px; border-radius: 20px; font-size: 13px; font-weight: 500; display: flex; align-items: center; gap: 6px; }
-  .schedule-badge { background: rgba(18,140,126,0.1); border: 1px solid rgba(18,140,126,0.3); color: var(--green-dark); padding: 6px 14px; border-radius: 8px; font-size: 13px; font-weight: 500; }
+  .products-list { display: flex; flex-wrap: wrap; gap: 10px; margin-top: 12px;}
+  .product-badge { background: rgba(37,211,102,0.1); border: 1px solid rgba(37,211,102,0.3); color: var(--green); padding: 6px 14px; border-radius: 20px; font-size: 13px; font-weight: 500; display: flex; align-items: center; gap: 6px;}
 
-  /* Connection Tab */
-  #tab-connection { flex-direction: column; align-items: center; justify-content: center; padding: 40px 24px; gap: 32px; }
-  .qr-panel { background: var(--surface); border: 1px solid var(--border); border-radius: 20px; padding: 32px; text-align: center; max-width: 420px; width: 100%; }
-  .qr-box { width: 220px; height: 220px; margin: 0 auto 24px; background: white; border-radius: 16px; display: flex; align-items: center; justify-content: center; position: relative; }
-  .qr-box img { width: 100%; height: 100%; object-fit: contain; }
-  .qr-placeholder, .qr-connected { display: flex; flex-direction: column; align-items: center; gap: 12px; color: #aaa; font-size: 13px; }
-  .check-circle { width: 64px; height: 64px; background: var(--green); border-radius: 50%; display: flex; align-items: center; justify-content: center; font-size: 32px; }
-
-  /* Menu Builder */
-  .menu-item { background: var(--bg); border: 1px solid var(--border); border-radius: 10px; overflow: hidden; margin-bottom: 8px; }
-  .menu-item-header { display: flex; align-items: center; gap: 10px; padding: 12px 16px; cursor: pointer; }
+  /* ── Menu Builder ── */
+  .menu-tree { display: flex; flex-direction: column; gap: 8px; }
+  .menu-item { background: var(--bg); border: 1px solid var(--border); border-radius: 10px; overflow: hidden; }
+  .menu-item-header { display: flex; align-items: center; gap: 10px; padding: 12px 16px; cursor: pointer; transition: background 0.15s; user-select: none; }
   .menu-item-header:hover { background: var(--surface2); }
-  .item-number { width: 26px; height: 26px; background: var(--surface2); border: 1px solid var(--border); border-radius: 6px; display: flex; align-items: center; justify-content: center; font-size: 12px; font-weight: 700; color: var(--green); }
+  .item-number { width: 26px; height: 26px; background: var(--surface2); border: 1px solid var(--border); border-radius: 6px; display: flex; align-items: center; justify-content: center; font-size: 12px; font-weight: 700; color: var(--green); flex-shrink: 0; }
   .item-label { flex: 1; font-size: 14px; font-weight: 500; }
-  .menu-item-body { display: none; padding: 0 16px 16px; border-top: 1px solid var(--border); }
+  .item-badge { font-size: 11px; padding: 2px 8px; border-radius: 999px; background: rgba(37,211,102,0.15); color: var(--green); border: 1px solid rgba(37,211,102,0.3); }
+  .item-badge.final { background: rgba(210,153,34,0.15); color: var(--warning); border-color: rgba(210,153,34,0.3); }
+  .chevron { color: var(--text-muted); transition: transform 0.2s; font-size: 12px; }
+  .menu-item.open .chevron { transform: rotate(90deg); }
+  .menu-item-body { display: none; padding: 0 16px 16px; border-top: 1px solid var(--border); margin-top: 0; }
   .menu-item.open .menu-item-body { display: block; }
-  .add-root-btn { border: 2px dashed var(--border); border-radius: 10px; padding: 14px; text-align: center; cursor: pointer; color: var(--text-muted); font-size: 13px; display: flex; align-items: center; justify-content: center; gap: 8px; background: none; width: 100%; transition: 0.2s;}
-  .add-root-btn:hover { border-color: var(--green); color: var(--green); }
-  
-  /* Simulator */
+  .item-form { padding-top: 14px; }
+  .item-form .form-group { margin-bottom: 12px; }
+  .children-list { margin-top: 12px; display: flex; flex-direction: column; gap: 6px; padding-left: 16px; border-left: 2px solid var(--border); }
+  .child-item { background: var(--surface); border: 1px solid var(--border); border-radius: 8px; overflow: hidden; }
+  .child-item-header { display: flex; align-items: center; gap: 8px; padding: 10px 14px; cursor: pointer; }
+  .child-item-header:hover { background: var(--surface2); }
+  .child-item-body { display: none; padding: 0 14px 14px; border-top: 1px solid var(--border); }
+  .child-item.open .child-item-body { display: block; }
+  .child-item.open .chevron { transform: rotate(90deg); }
+  .item-actions { display: flex; gap: 8px; margin-top: 12px; }
+  .btn-icon { width: 30px; height: 30px; border-radius: 6px; border: 1px solid var(--border); background: var(--surface2); color: var(--text-muted); display: flex; align-items: center; justify-content: center; cursor: pointer; font-size: 14px; transition: all 0.15s; }
+  .btn-icon:hover { border-color: var(--danger); color: var(--danger); }
+  .add-root-btn { border: 2px dashed var(--border); border-radius: 10px; padding: 14px; text-align: center; cursor: pointer; color: var(--text-muted); font-size: 13px; transition: all 0.2s; display: flex; align-items: center; justify-content: center; gap: 8px; background: none; width: 100%; }
+  .add-root-btn:hover { border-color: var(--green); color: var(--green); background: rgba(37,211,102,0.05); }
+
+  /* ── Tab 3: Simulador ── */
   #tab-simulator { flex-direction: column; align-items: center; padding: 32px 24px; gap: 20px; }
-  .sim-container { width: 100%; max-width: 420px; height: 600px; border: 1px solid var(--border); border-radius: 24px; background: #0b141a; display: flex; flex-direction: column; overflow: hidden; }
+  .sim-container {
+    width: 100%; max-width: 420px; height: 600px; border: 1px solid var(--border); border-radius: 24px;
+    background: #0b141a; display: flex; flex-direction: column; overflow: hidden; box-shadow: 0 10px 30px rgba(0,0,0,0.5);
+  }
   .sim-header { background: var(--surface); padding: 16px; border-bottom: 1px solid var(--border); display: flex; align-items: center; gap: 12px; }
   .sim-header-avatar { width: 40px; height: 40px; border-radius: 50%; background: var(--green); display: flex; align-items: center; justify-content: center; font-size: 20px; }
-  .sim-chat { flex: 1; padding: 16px; overflow-y: auto; display: flex; flex-direction: column; gap: 10px; background-image: url('https://user-images.githubusercontent.com/15075759/28719144-86dc0f70-73b1-11e7-911d-60d70fcded21.png'); background-size: cover; background-blend-mode: overlay; background-color: rgba(11, 20, 26, 0.95); }
+  .sim-header-info h3 { font-size: 15px; color: white; margin-bottom: 2px; font-family: 'DM Sans', sans-serif;}
+  .sim-header-info p { font-size: 12px; color: var(--text-muted); }
+  
+  .sim-chat {
+    flex: 1; padding: 16px; overflow-y: auto; display: flex; flex-direction: column; gap: 10px;
+    background-image: url('https://user-images.githubusercontent.com/15075759/28719144-86dc0f70-73b1-11e7-911d-60d70fcded21.png');
+    background-size: cover; background-blend-mode: overlay; background-color: rgba(11, 20, 26, 0.95);
+  }
   .sim-msg { max-width: 85%; padding: 8px 12px; border-radius: 12px; font-size: 14.5px; line-height: 1.4; color: #e9edef; font-family: 'DM Sans', sans-serif;}
   .sim-msg strong { font-weight: 700; color: white;}
   .sim-msg.user { align-self: flex-end; background: #005c4b; border-top-right-radius: 0; }
   .sim-msg.bot { align-self: flex-start; background: #202c33; border-top-left-radius: 0; }
+  
   .sim-input-area { background: var(--surface); padding: 12px 16px; display: flex; gap: 10px; border-top: 1px solid var(--border); }
   .sim-input-area input { flex: 1; border-radius: 24px; background: var(--bg); border: 1px solid var(--border); padding: 12px 16px; color: white; outline: none; }
   .sim-input-area button { width: 44px; height: 44px; border-radius: 50%; background: var(--green); color: black; border: none; cursor: pointer; font-size: 18px; display: flex; align-items: center; justify-content: center; transition: 0.2s;}
+  .sim-input-area button:hover { transform: scale(1.05); }
 
-  /* Tab Sobre */
+  /* ── Tab 4: Sobre ── */
   #tab-about { flex-direction: column; max-width: 720px; margin: 0 auto; width: 100%; padding: 32px 24px; gap: 20px; }
   .about-header { background: linear-gradient(135deg, var(--green-dark), var(--green)); border-radius: var(--radius); padding: 32px; text-align: center; color: #000; }
   .about-header h2 { font-family: 'Syne', sans-serif; font-size: 20px; font-weight: 800; margin-bottom: 6px; }
@@ -109,10 +201,13 @@
   .about-row-label { color: var(--text-muted); width: 110px; flex-shrink: 0; font-size: 13px; }
   .about-row-value { color: var(--text); font-weight: 600; }
 
-  /* Utils */
+  /* Extras */
   .toast { position: fixed; bottom: 24px; right: 24px; background: var(--surface); border: 1px solid var(--border); border-radius: 12px; padding: 14px 20px; display: flex; align-items: center; gap: 12px; font-size: 14px; font-weight: 500; z-index: 999; transform: translateY(100px); opacity: 0; transition: all 0.3s; }
   .toast.show { transform: translateY(0); opacity: 1; }
   .toast.success { border-color: rgba(37,211,102,0.4); }
+  .toast.error { border-color: rgba(248,81,73,0.4); }
+  .spinner { width: 20px; height: 20px; border: 2px solid rgba(37,211,102,0.3); border-top-color: var(--green); border-radius: 50%; animation: spin 0.8s linear infinite; flex-shrink: 0; }
+  @keyframes spin { to { transform: rotate(360deg); } }
   .info-box { background: rgba(37,211,102,0.08); border: 1px solid rgba(37,211,102,0.2); border-radius: 8px; padding: 12px 16px; font-size: 13px; color: var(--text-muted); line-height: 1.5; }
   ::-webkit-scrollbar { width: 6px; }
   ::-webkit-scrollbar-track { background: transparent; }
@@ -133,34 +228,65 @@
 </header>
 
 <div class="tabs-nav">
-  <button class="tab-btn active" onclick="switchTab('connection')" id="tab-btn-connection"><i class="fa-solid fa-mobile-screen"></i> Conexão</button>
-  <button class="tab-btn" onclick="switchTab('settings')" id="tab-btn-settings"><i class="fa-solid fa-gear"></i> Configurações</button>
-  <button class="tab-btn" onclick="switchTab('simulator')" id="tab-btn-simulator"><i class="fa-regular fa-comment-dots"></i> Simulador</button>
-  <button class="tab-btn" onclick="switchTab('about')" id="tab-btn-about"><i class="fa-solid fa-circle-info"></i> Sobre</button>
+  <button class="tab-btn active" onclick="switchTab('connection')" id="tab-btn-connection">
+    <i class="fa-solid fa-mobile-screen"></i> Conexão
+  </button>
+  <button class="tab-btn" onclick="switchTab('settings')" id="tab-btn-settings">
+    <i class="fa-solid fa-gear"></i> Configurações
+  </button>
+  <button class="tab-btn" onclick="switchTab('simulator')" id="tab-btn-simulator">
+    <i class="fa-regular fa-comment-dots"></i> Simulador
+  </button>
+  <button class="tab-btn" onclick="switchTab('about')" id="tab-btn-about">
+    <i class="fa-solid fa-circle-info"></i> Sobre
+  </button>
 </div>
 
 <div class="tab-content active" id="tab-connection">
+  <div class="business-card">
+    <input type="file" id="logoInput" accept="image/*" style="display:none" onchange="handleLogoUpload(event)">
+    <div class="business-logo-wrap" onclick="document.getElementById('logoInput').click()" title="Clique para alterar o logo">
+      <span id="logoEmoji">🏢</span>
+      <img id="logoImg" src="" style="display:none">
+      <div class="logo-overlay"><i class="fa-solid fa-camera"></i></div>
+    </div>
+    <div class="business-name-display" id="businessNameDisplay">Meu Negócio</div>
+    <div class="business-subtitle">Bot de Atendimento WhatsApp</div>
+  </div>
+
   <div class="qr-panel">
     <h2>Conectar WhatsApp</h2>
-    <p>Inicie o bot e escaneie o QR Code com seu WhatsApp para ativar a automação.</p>
+    <p>Inicie o bot e escaneie o QR Code com seu WhatsApp para conectar o bot ao seu número.</p>
 
     <div class="qr-box" id="qrBox">
       <div class="qr-placeholder" id="qrPlaceholder">
         <i class="fa-solid fa-qrcode" style="font-size: 64px;"></i>
         <span>Aguardando início...</span>
       </div>
-      <div id="qrLoading" style="display:none" class="qr-placeholder"><i class="fa-solid fa-spinner fa-spin" style="font-size: 32px;"></i></div>
-      <img id="qrImage" src="" style="display:none">
+      <div id="qrLoading" style="display:none">
+        <div class="spinner"></div>
+      </div>
+      <img id="qrImage" src="" style="display:none" alt="QR Code">
       <div id="qrConnected" style="display:none" class="qr-connected">
         <div class="check-circle"><i class="fa-solid fa-check" style="color: #000;"></i></div>
         <span style="color:#aaa;font-size:13px">Conectado!</span>
       </div>
     </div>
 
+    <div class="info-box" style="margin-bottom:20px">
+      📌 Abra o WhatsApp → <strong>Dispositivos vinculados</strong> → <strong>Vincular um dispositivo</strong> → Escaneie o QR Code
+    </div>
+
     <div style="display:flex;gap:10px;justify-content:center">
-      <button class="btn btn-primary" id="btnStart" onclick="startBot()"><i class="fa-solid fa-play"></i> Iniciar Bot</button>
-      <button class="btn" id="btnRestart" onclick="restartBot()" style="display:none; background-color: var(--warning); color: #fff; border: none;"><i class="fa-solid fa-rotate-right"></i> Reiniciar Bot</button>
-      <button class="btn btn-danger" id="btnStop" onclick="stopBot()" style="display:none"><i class="fa-solid fa-square"></i> Parar Bot</button>
+      <button class="btn btn-primary" id="btnStart" onclick="startBot()">
+        <i class="fa-solid fa-play"></i> Iniciar Bot
+      </button>
+      <button class="btn" id="btnRestart" onclick="restartBot()" style="display:none; background-color: var(--warning); color: #fff; border: none;">
+        <i class="fa-solid fa-rotate-right"></i> Reiniciar Bot
+      </button>
+      <button class="btn btn-danger" id="btnStop" onclick="stopBot()" style="display:none">
+        <i class="fa-solid fa-square"></i> Parar Bot
+      </button>
     </div>
   </div>
 </div>
@@ -172,39 +298,17 @@
     </div>
     <div class="form-group">
       <label>Nome do Negócio</label>
-      <input type="text" id="businessName" placeholder="Ex: Barbearia do João" oninput="updateBusinessName()">
+      <input type="text" id="businessName" placeholder="Ex: Loja do João" oninput="updateBusinessName()">
     </div>
     <div class="form-group">
       <label>Mensagem de Boas-vindas</label>
-      <textarea id="welcomeMessage" placeholder="Ex: Olá! Bem-vindo à nossa barbearia. Como posso ajudar?"></textarea>
-    </div>
-  </div>
-
-  <div class="settings-section" style="border-left: 4px solid var(--green);">
-    <div class="section-header" style="margin-bottom: 0;">
-      <div class="section-title"><i class="fa-solid fa-calendar-check" style="color: var(--green);"></i> Agendamento Nativo WhatsApp</div>
-      <label class="switch">
-        <input type="checkbox" id="toggleScheduling" onchange="toggleScheduleUI(this.checked)">
-        <span class="slider round"></span>
-      </label>
-    </div>
-    <div id="schedulingPanel" style="display:none; padding-top: 16px; margin-top: 16px; border-top: 1px solid var(--border);">
-      <p style="font-size: 13px; color: var(--text-muted); margin-bottom: 16px; line-height: 1.5;">
-        O bot perguntará o <strong>Dia</strong> e a <strong>Hora</strong> diretamente no chat e enviará o agendamento direto para a sua agenda no painel.
-      </p>
-      <div class="form-group" style="max-width: 300px;">
-        <label>Disponibilizar agenda para quantos dias à frente?</label>
-        <div style="display:flex; align-items:center; gap: 10px;">
-          <input type="number" id="schedulingDays" min="1" max="60" value="7" style="width: 80px;">
-          <span style="font-size: 14px; color: var(--text-muted);">dias corridos</span>
-        </div>
-      </div>
+      <textarea id="welcomeMessage" placeholder="Ex: Olá! Bem-vindo à nossa loja. Como posso ajudar?"></textarea>
     </div>
   </div>
 
   <div class="settings-section">
     <div class="section-header" style="margin-bottom: 0;">
-      <div class="section-title"><i class="fa-solid fa-tags"></i> Integração de Serviços / Produtos</div>
+      <div class="section-title"><i class="fa-solid fa-tags"></i> Integração de Produtos/Serviços</div>
       <label class="switch">
         <input type="checkbox" id="toggleProducts" onchange="toggleProductsUI(this.checked)">
         <span class="slider round"></span>
@@ -212,22 +316,23 @@
     </div>
     <div id="productsPanel" style="display:none; padding-top: 16px; margin-top: 16px; border-top: 1px solid var(--border);">
       <p style="font-size: 13px; color: var(--text-muted); margin-bottom: 12px; line-height: 1.5;">
-        Adiciona a opção "Catálogo" no menu e também <strong>pergunta qual serviço o cliente deseja na hora de agendar</strong>.
+        Com esta chave ativada, os itens cadastrados no seu painel principal serão exibidos automaticamente como uma opção no Menu do robô.
       </p>
       <div class="products-list">
-        <div class="product-badge"><i class="fa-solid fa-scissors"></i> Corte Social - R$ 40,00</div>
-        <div class="product-badge"><i class="fa-solid fa-spray-can"></i> Barba Completa - R$ 35,00</div>
+        <div class="product-badge"><i class="fa-solid fa-box-open"></i> Produto Exemplo 1 - R$ 50,00</div>
+        <div class="product-badge"><i class="fa-solid fa-box-open"></i> Combo Especial - R$ 120,00</div>
       </div>
     </div>
   </div>
 
   <div class="settings-section">
     <div class="section-header">
-      <div class="section-title"><i class="fa-solid fa-sitemap"></i> Outras Opções de Menu (Manuais)</div>
+      <div class="section-title"><i class="fa-solid fa-sitemap"></i> Fluxo de Atendimento</div>
+      <span style="font-size:12px;color:var(--text-muted)">Máx. 2 níveis de submenu</span>
     </div>
     <div class="menu-tree" id="menuTree"></div>
     <div style="margin-top:10px">
-      <button class="add-root-btn" onclick="addRootItem()"><i class="fa-solid fa-plus"></i> Adicionar opção manual (ex: Localização)</button>
+      <button class="add-root-btn" onclick="addRootItem()"><i class="fa-solid fa-plus"></i> Adicionar opção de menu</button>
     </div>
   </div>
 
@@ -239,7 +344,7 @@
 
 <div class="tab-content" id="tab-simulator">
   <div class="info-box" style="width: 100%; max-width: 420px; text-align: center;">
-    💡 <strong>Teste ao vivo!</strong> Se o Agendamento estiver ativado, faça o fluxo completo abaixo.
+    💡 <strong>Teste suas configurações!</strong> O chat abaixo simula exatamente como o robô responderá no WhatsApp real.
   </div>
   
   <div class="sim-container">
@@ -250,7 +355,10 @@
         <p>Bot de Atendimento</p>
       </div>
     </div>
-    <div class="sim-chat" id="simChat"></div>
+    
+    <div class="sim-chat" id="simChat">
+      </div>
+    
     <div class="sim-input-area">
       <input type="text" id="simInput" placeholder="Digite uma mensagem..." onkeydown="if(event.key==='Enter') handleSimulate()">
       <button onclick="handleSimulate()"><i class="fa-solid fa-paper-plane"></i></button>
@@ -276,7 +384,7 @@
     </div>
     <div class="about-row" style="border:none; padding-top: 16px;">
       <a href="https://wa.me/5547992907248" target="_blank" class="btn btn-primary" style="width:100%; text-decoration:none;">
-        <i class="fa-brands fa-whatsapp fa-lg"></i> Falar com Suporte (WhatsApp)
+        <i class="fa-brands fa-whatsapp fa-lg"></i> Chamar Suporte no WhatsApp
       </a>
     </div>
   </div>
@@ -294,14 +402,23 @@
   </div>
 </div>
 
-<div class="toast" id="toast"><span id="toastIcon"></span><span id="toastMsg"></span></div>
+<div class="toast" id="toast">
+  <span id="toastIcon">✓</span>
+  <span id="toastMsg">Salvo!</span>
+</div>
 
 <script>
+// ── State & Multi-tenant ───────────────────────────────────────────────────
 const urlParams = new URLSearchParams(window.location.search);
 const sessao = urlParams.get('sessao') || 'default';
 
-let config = { business_name: '', welcome_message: '', menu: [], show_products: false, enable_scheduling: false, scheduling_days_ahead: 7 };
+let config = { business_name: '', business_logo: '', welcome_message: '', menu: [], show_products: false };
 let ws = null;
+let botStatus = 'stopped';
+
+// Variáveis do Simulador
+let simActive = false;
+let simPath = [];
 
 function switchTab(name) {
   document.querySelectorAll('.tab-content').forEach(t => t.classList.remove('active'));
@@ -311,7 +428,9 @@ function switchTab(name) {
   
   if(name === 'simulator') {
     document.getElementById('simBusinessName').textContent = config.business_name || 'Meu Negócio';
-    if(document.getElementById('simChat').innerHTML.trim() === '') addSimMessage('Envie um "Oi" para iniciar o teste! 👋', 'bot');
+    if(document.getElementById('simChat').innerHTML.trim() === '') {
+      addSimMessage('Envie um "Oi" para testar o seu robô! 👋', 'bot');
+    }
   }
 }
 
@@ -324,7 +443,7 @@ function showToast(msg, type = 'success') {
   setTimeout(() => toast.classList.remove('show'), 3000);
 }
 
-// ── WebSocket & Controle do Bot ───────────────────────────────────────────
+// ── WebSocket & Status ──────────────────────────────────────────────────────
 function connectWS() {
   const proto = location.protocol === 'https:' ? 'wss' : 'ws';
   ws = new WebSocket(`${proto}://${location.host}/bot-interno/ws/${sessao}`);
@@ -339,12 +458,15 @@ function connectWS() {
 function showQR(dataUrl) {
   document.getElementById('qrPlaceholder').style.display = 'none';
   document.getElementById('qrLoading').style.display = 'none';
-  document.getElementById('qrImage').src = dataUrl;
-  document.getElementById('qrImage').style.display = 'block';
+  document.getElementById('qrConnected').style.display = 'none';
+  const img = document.getElementById('qrImage');
+  img.src = dataUrl;
+  img.style.display = 'block';
   updateBotStatus('waiting_qr');
 }
 
 function updateBotStatus(status) {
+  botStatus = status;
   const dot = document.getElementById('statusDot');
   const text = document.getElementById('statusText');
   const start = document.getElementById('btnStart');
@@ -352,6 +474,7 @@ function updateBotStatus(status) {
   const restart = document.getElementById('btnRestart');
 
   dot.className = 'status-dot';
+
   if (status === 'connected') {
     dot.classList.add('connected'); text.textContent = 'Conectado';
     document.getElementById('qrPlaceholder').style.display = 'none';
@@ -359,12 +482,13 @@ function updateBotStatus(status) {
     document.getElementById('qrImage').style.display = 'none';
     document.getElementById('qrConnected').style.display = 'flex';
     start.style.display = 'none'; restart.style.display = 'inline-flex'; stop.style.display = 'inline-flex';
-  } else if (status === 'waiting_qr' || status === 'starting') {
-    dot.classList.add('connecting'); text.textContent = 'Aguardando QR';
+  } else if (status === 'waiting_qr' || status === 'authenticated') {
+    dot.classList.add('connecting'); text.textContent = status === 'authenticated' ? 'Autenticando...' : 'Aguardando QR';
     start.style.display = 'none'; restart.style.display = 'inline-flex'; stop.style.display = 'inline-flex';
-  } else {
+  } else if (status === 'stopped') {
     text.textContent = 'Desconectado';
     document.getElementById('qrPlaceholder').style.display = 'flex';
+    document.getElementById('qrLoading').style.display = 'none';
     document.getElementById('qrImage').style.display = 'none';
     document.getElementById('qrConnected').style.display = 'none';
     start.style.display = 'inline-flex'; restart.style.display = 'none'; stop.style.display = 'none';
@@ -374,18 +498,43 @@ function updateBotStatus(status) {
 async function startBot() {
   document.getElementById('qrPlaceholder').style.display = 'none';
   document.getElementById('qrLoading').style.display = 'flex';
-  await fetch(`/bot-interno/api/bot/start?sessao=${sessao}`, { method: 'POST' });
+  document.getElementById('btnStart').disabled = true;
+
+  const r = await fetch(`/bot-interno/api/bot/start?sessao=${sessao}`, { method: 'POST' });
+  const d = await r.json();
+
+  if (d.status === 'error') {
+    showToast(d.message, 'error');
+    document.getElementById('btnStart').disabled = false;
+    document.getElementById('qrLoading').style.display = 'none';
+    document.getElementById('qrPlaceholder').style.display = 'flex';
+  } else {
+    document.getElementById('btnStart').style.display = 'none';
+    document.getElementById('btnStop').style.display = 'inline-flex';
+    document.getElementById('statusDot').classList.add('connecting');
+    document.getElementById('statusText').textContent = 'Iniciando...';
+  }
 }
 
-async function stopBot() { await fetch(`/bot-interno/api/bot/stop?sessao=${sessao}`, { method: 'POST' }); updateBotStatus('stopped'); }
+async function stopBot() {
+  await fetch(`/bot-interno/api/bot/stop?sessao=${sessao}`, { method: 'POST' });
+  updateBotStatus('stopped');
+  document.getElementById('btnStart').disabled = false;
+}
 
 async function restartBot() {
-  showToast('Reiniciando...', 'success');
+  document.getElementById('btnRestart').disabled = true;
+  document.getElementById('btnStop').disabled = true;
+  showToast('Reiniciando robô...', 'success');
   await fetch(`/bot-interno/api/bot/stop?sessao=${sessao}`, { method: 'POST' });
-  setTimeout(() => startBot(), 1500);
+  setTimeout(async () => {
+    await startBot();
+    document.getElementById('btnRestart').disabled = false;
+    document.getElementById('btnStop').disabled = false;
+  }, 1500);
 }
 
-// ── Configurações ─────────────────────────────────────────────────────────
+// ── Config Load/Save ──────────────────────────────────────────────────────
 async function loadConfig() {
   const r = await fetch(`/bot-interno/api/config?sessao=${sessao}`);
   config = await r.json();
@@ -393,14 +542,16 @@ async function loadConfig() {
   document.getElementById('businessName').value = config.business_name || '';
   document.getElementById('welcomeMessage').value = config.welcome_message || '';
   updateBusinessName();
-  
+
+  // Produtos Toggle
   document.getElementById('toggleProducts').checked = config.show_products === true;
   toggleProductsUI(config.show_products === true);
-  
-  document.getElementById('toggleScheduling').checked = config.enable_scheduling === true;
-  document.getElementById('schedulingDays').value = config.scheduling_days_ahead || 7;
-  toggleScheduleUI(config.enable_scheduling === true);
 
+  if (config.business_logo) {
+    document.getElementById('logoImg').src = config.business_logo;
+    document.getElementById('logoImg').style.display = 'block';
+    document.getElementById('logoEmoji').style.display = 'none';
+  }
   renderMenuTree();
 }
 
@@ -408,195 +559,214 @@ async function saveConfig() {
   config.business_name = document.getElementById('businessName').value;
   config.welcome_message = document.getElementById('welcomeMessage').value;
   config.show_products = document.getElementById('toggleProducts').checked;
-  config.enable_scheduling = document.getElementById('toggleScheduling').checked;
-  config.scheduling_days_ahead = parseInt(document.getElementById('schedulingDays').value) || 7;
 
-  await fetch(`/bot-interno/api/config?sessao=${sessao}`, { method: 'POST', headers: { 'Content-Type': 'application/json' }, body: JSON.stringify(config) });
-  showToast('Salvo com sucesso!', 'success');
+  const r = await fetch(`/bot-interno/api/config?sessao=${sessao}`, {
+    method: 'POST',
+    headers: { 'Content-Type': 'application/json' },
+    body: JSON.stringify(config)
+  });
+  const d = await r.json();
+  showToast(d.message || 'Salvo!', 'success');
   updateBusinessName();
 }
 
 function updateBusinessName() {
   const val = document.getElementById('businessName').value || 'Meu Negócio';
+  document.getElementById('businessNameDisplay').textContent = val;
   document.getElementById('sobreEmpresaLabel').textContent = val;
+  config.business_name = val;
 }
 
-function toggleProductsUI(isChecked) { document.getElementById('productsPanel').style.display = isChecked ? 'block' : 'none'; }
-function toggleScheduleUI(isChecked) { document.getElementById('schedulingPanel').style.display = isChecked ? 'block' : 'none'; }
+function toggleProductsUI(isChecked) {
+  document.getElementById('productsPanel').style.display = isChecked ? 'block' : 'none';
+}
 
-// ── Menu Manual Builder ───────────────────────────────────────────────────
-function generateId() { return Date.now().toString(36); }
-function escapeHtml(str) { return (str || '').replace(/&/g,'&amp;').replace(/</g,'&lt;').replace(/>/g,'&gt;'); }
+function handleLogoUpload(e) {
+  const file = e.target.files[0];
+  if (!file) return;
+  const reader = new FileReader();
+  reader.onload = (ev) => {
+    config.business_logo = ev.target.result;
+    document.getElementById('logoImg').src = ev.target.result;
+    document.getElementById('logoImg').style.display = 'block';
+    document.getElementById('logoEmoji').style.display = 'none';
+  };
+  reader.readAsDataURL(file);
+}
+
+// ── Menu Builder ──────────────────────────────────────────────────────────
+function generateId() { return Date.now().toString(36) + Math.random().toString(36).slice(2, 5); }
+function escapeHtml(str) { return (str || '').replace(/&/g,'&amp;').replace(/</g,'&lt;').replace(/>/g,'&gt;').replace(/"/g,'&quot;'); }
 function toggleItem(el) { el.classList.toggle('open'); }
+function toggleChildItem(el) { el.classList.toggle('open'); }
 
 function renderMenuTree() {
-  const tree = document.getElementById('menuTree'); tree.innerHTML = '';
+  const tree = document.getElementById('menuTree');
+  tree.innerHTML = '';
   (config.menu || []).forEach((item, i) => tree.appendChild(createRootItem(item, i)));
 }
 
 function createRootItem(item, index) {
-  const div = document.createElement('div'); div.className = 'menu-item';
+  const div = document.createElement('div');
+  div.className = 'menu-item';
+  const hasChildren = item.children && item.children.length > 0;
+  const badgeText = hasChildren ? `${item.children.length} subopções` : 'Resposta final';
+  const badgeClass = hasChildren ? '' : 'final';
+
   div.innerHTML = `
     <div class="menu-item-header" onclick="toggleItem(this.parentElement)">
       <div class="item-number">${index + 1}</div>
       <div class="item-label">${item.text || 'Nova opção'}</div>
+      <span class="item-badge ${badgeClass}">${badgeText}</span>
+      <span class="chevron"><i class="fa-solid fa-chevron-right"></i></span>
     </div>
     <div class="menu-item-body">
-      <div class="form-group" style="padding-top:10px">
-        <label>Nome do Botão/Opção</label>
-        <input type="text" value="${escapeHtml(item.text)}" placeholder="Ex: Localização" oninput="config.menu[${index}].text=this.value; renderMenuTree()">
+      <div class="item-form">
+        <div class="form-group">
+          <label>Texto da opção</label>
+          <input type="text" value="${escapeHtml(item.text || '')}" placeholder="Ex: 📦 Produtos" oninput="updateItemText(${index}, this.value)">
+        </div>
+        <div class="form-group" id="finalResponse-${index}" ${hasChildren ? 'style="display:none"' : ''}>
+          <label>Resposta final</label>
+          <textarea placeholder="Mensagem enviada ao cliente..." oninput="updateItemFinalResponse(${index}, this.value)">${escapeHtml(item.final_response || '')}</textarea>
+        </div>
+        <div class="children-list" id="children-${index}"></div>
+        <div class="item-actions">
+          <button class="btn btn-sm btn-secondary" onclick="addChild(${index})"><i class="fa-solid fa-plus"></i> Subopção</button>
+          <div style="flex:1"></div>
+          <button class="btn-icon" onclick="removeRootItem(${index})"><i class="fa-regular fa-trash-can"></i></button>
+        </div>
       </div>
-      <div class="form-group">
-        <label>Mensagem de Resposta</label>
-        <textarea placeholder="Ex: Estamos na Rua X..." oninput="config.menu[${index}].final_response=this.value">${escapeHtml(item.final_response)}</textarea>
+    </div>
+  `;
+  const childrenContainer = div.querySelector(`#children-${index}`);
+  (item.children || []).forEach((child, ci) => childrenContainer.appendChild(createChildItem(child, index, ci)));
+  return div;
+}
+
+function createChildItem(item, parentIndex, childIndex) {
+  const div = document.createElement('div');
+  div.className = 'child-item';
+  div.innerHTML = `
+    <div class="child-item-header" onclick="toggleChildItem(this.parentElement)">
+      <div class="item-number" style="width:22px;height:22px;font-size:11px">${parentIndex+1}.${childIndex+1}</div>
+      <div class="item-label" style="font-size:13px">${item.text || 'Nova subopção'}</div>
+      <span class="item-badge final" style="font-size:10px">Resposta final</span>
+      <span class="chevron" style="font-size:10px"><i class="fa-solid fa-chevron-right"></i></span>
+    </div>
+    <div class="child-item-body">
+      <div style="padding-top:12px">
+        <div class="form-group">
+          <label>Texto da subopção</label>
+          <input type="text" value="${escapeHtml(item.text || '')}" placeholder="Ex: Ver catálogo" oninput="updateChildText(${parentIndex}, ${childIndex}, this.value)">
+        </div>
+        <div class="form-group">
+          <label>Resposta ao cliente</label>
+          <textarea placeholder="Mensagem final enviada ao cliente..." oninput="updateChildFinalResponse(${parentIndex}, ${childIndex}, this.value)">${escapeHtml(item.final_response || '')}</textarea>
+        </div>
+        <div style="display:flex;justify-content:flex-end">
+          <button class="btn-icon" onclick="removeChild(${parentIndex}, ${childIndex})"><i class="fa-regular fa-trash-can"></i></button>
+        </div>
       </div>
-      <button class="btn btn-sm btn-danger" onclick="config.menu.splice(${index}, 1); renderMenuTree()">Remover</button>
     </div>
   `;
   return div;
 }
 
-function addRootItem() { config.menu.push({ id: generateId(), text: 'Nova Opção', final_response: '' }); renderMenuTree(); }
+function addRootItem() { if (!config.menu) config.menu = []; config.menu.push({ id: generateId(), text: '', children: [], final_response: '' }); renderMenuTree(); const items = document.querySelectorAll('.menu-item'); if (items.length) items[items.length-1].classList.add('open'); }
+function removeRootItem(index) { config.menu.splice(index, 1); renderMenuTree(); }
+function addChild(parentIndex) { if (!config.menu[parentIndex].children) config.menu[parentIndex].children = []; config.menu[parentIndex].children.push({ id: generateId(), text: '', children: [], final_response: '' }); config.menu[parentIndex].final_response = null; renderMenuTree(); const items = document.querySelectorAll('.menu-item'); if (items[parentIndex]) items[parentIndex].classList.add('open'); }
+function removeChild(parentIndex, childIndex) { config.menu[parentIndex].children.splice(childIndex, 1); if (config.menu[parentIndex].children.length === 0) { config.menu[parentIndex].final_response = ''; } renderMenuTree(); const items = document.querySelectorAll('.menu-item'); if (items[parentIndex]) items[parentIndex].classList.add('open'); }
+function updateItemText(index, val) { config.menu[index].text = val; document.querySelectorAll('.menu-item')[index].querySelector('.item-label').textContent = val || 'Nova opção'; }
+function updateItemFinalResponse(index, val) { config.menu[index].final_response = val; }
+function updateChildText(parentIndex, childIndex, val) { config.menu[parentIndex].children[childIndex].text = val; document.querySelectorAll('.menu-item')[parentIndex].querySelectorAll('.child-item .item-label')[childIndex].textContent = val || 'Nova subopção'; }
+function updateChildFinalResponse(parentIndex, childIndex, val) { config.menu[parentIndex].children[childIndex].final_response = val; }
 
-// ── Simulador com Máquina de Estados (Agendamento) ────────────────────────
-let simState = { active: false, flow: 'menu', data: {} };
-const mockHorarios = ['09:00', '10:00', '14:00', '15:30', '17:00'];
-const mockServicos = ['Corte Social', 'Barba Completa', 'Combo Corte + Barba', 'Platinado'];
-
-function getNextDaysListSim() {
-    let days = []; let curr = new Date(); const week = ['Dom','Seg','Ter','Qua','Qui','Sex','Sáb'];
-    for(let i=1; i<=config.scheduling_days_ahead; i++) {
-        curr.setDate(curr.getDate() + 1);
-        let d = String(curr.getDate()).padStart(2, '0'); let m = String(curr.getMonth() + 1).padStart(2, '0');
-        days.push(`${week[curr.getDay()]} ${d}/${m}`);
-    }
-    return days;
-}
-
+// ── Lógica do Simulador ───────────────────────────────────────────────────
 function addSimMessage(text, sender) {
   const chat = document.getElementById('simChat');
   const msgDiv = document.createElement('div');
   msgDiv.className = `sim-msg ${sender}`;
+  // Converte quebras de linha e negrito do WhatsApp (*) para HTML
   msgDiv.innerHTML = escapeHtml(text).replace(/\n/g, '<br>').replace(/\*(.*?)\*/g, '<strong>$1</strong>');
   chat.appendChild(msgDiv);
   chat.scrollTop = chat.scrollHeight;
 }
 
-function getActiveSimMenu() {
-    let active = JSON.parse(JSON.stringify(config.menu || []));
-    if (config.show_products) active.push({ text: "📋 Nossos Serviços/Produtos", is_catalogo: true });
-    if (config.enable_scheduling) active.push({ text: "📅 Agendar Horário", is_agendamento: true });
-    return active;
+function buildMenuTextSim(items) {
+  return items.map((item, idx) => `*${idx + 1}.* ${item.text}`).join('\n');
 }
 
 function handleSimulate() {
   const input = document.getElementById('simInput');
   const text = input.value.trim();
   if (!text) return;
+  
   addSimMessage(text, 'user');
   input.value = '';
+  
+  // Simula o tempo de digitação do robô
   setTimeout(() => processSimMessage(text), 600);
 }
 
 function processSimMessage(body) {
   let textLower = body.toLowerCase();
-  let activeMenu = getActiveSimMenu();
-  const menuText = activeMenu.map((m, i) => `*${i+1}.* ${m.text}`).join('\n');
+  
+  // Combina o menu original com a opção de Produtos (se ativado)
+  let menuAtivo = JSON.parse(JSON.stringify(config.menu || []));
+  if (config.show_products) {
+    menuAtivo.push({ text: "Nossos Produtos", final_response: "Aqui está a lista de produtos...\n(Esta resposta virá do seu painel Flask)" });
+  }
 
-  if (textLower === 'menu' || textLower === 'oi' || body === '0') {
-    simState = { active: true, flow: 'menu', data: {} };
-    addSimMessage(`${config.welcome_message}\n\n${menuText}\n\n_Digite o número da opção desejada._`, 'bot');
+  if (textLower === 'menu' || body === '0') {
+    simPath = []; simActive = true;
+    addSimMessage(`${config.welcome_message}\n\n${buildMenuTextSim(menuAtivo)}\n\n_Digite o número da opção desejada._`, 'bot');
     return;
   }
 
-  if (!simState.active) {
-    simState = { active: true, flow: 'menu', data: {} };
-    addSimMessage(`${config.welcome_message}\n\n${menuText}\n\n_Como posso ajudar? Digite uma opção:_`, 'bot');
+  if (!simActive) {
+    simPath = []; simActive = true;
+    addSimMessage(`${config.welcome_message}\n\n${buildMenuTextSim(menuAtivo)}\n\n_Como posso ajudar? Digite uma opção:_`, 'bot');
     return;
   }
 
-  // Máquina de Estados: Agendamento
-  if (simState.flow.startsWith('schedule_')) {
-      const choice = parseInt(body) - 1;
-      
-      if (simState.flow === 'schedule_day') {
-          const days = getNextDaysListSim();
-          if (isNaN(choice) || choice < 0 || choice >= days.length) {
-              addSimMessage('❌ Opção inválida. Escolha um número da lista.', 'bot'); return;
-          }
-          simState.data.day = days[choice];
-          simState.flow = 'schedule_time';
-          let timeText = mockHorarios.map((h, i) => `*${i+1}.* ${h}`).join('\n');
-          addSimMessage(`Você escolheu *${days[choice]}*.\n\nHorários disponíveis:\n${timeText}\n\n_Digite o número do horário:_`, 'bot');
-          return;
-      }
-
-      if (simState.flow === 'schedule_time') {
-          if (isNaN(choice) || choice < 0 || choice >= mockHorarios.length) {
-              addSimMessage('❌ Horário inválido. Escolha um número.', 'bot'); return;
-          }
-          simState.data.time = mockHorarios[choice];
-          
-          if (config.show_products) {
-              simState.flow = 'schedule_service';
-              let servText = mockServicos.map((s, i) => `*${i+1}.* ${s}`).join('\n');
-              addSimMessage(`Horário reservado para *${mockHorarios[choice]}*.\n\nQual serviço você deseja realizar?\n${servText}\n\n_Digite o número do serviço:_`, 'bot');
-              return;
-          } else {
-              finalizarSimulacao(); return;
-          }
-      }
-
-      if (simState.flow === 'schedule_service') {
-          if (isNaN(choice) || choice < 0 || choice >= mockServicos.length) {
-              addSimMessage('❌ Serviço inválido. Escolha um número.', 'bot'); return;
-          }
-          simState.data.service = mockServicos[choice];
-          finalizarSimulacao(); return;
-      }
+  const choice = parseInt(body) - 1;
+  if (isNaN(choice) || choice < 0) {
+    addSimMessage('❌ Opção inválida. Digite o número ou *menu* para reiniciar.', 'bot');
+    return;
   }
 
-  function finalizarSimulacao() {
-      let resumo = `✅ *AGENDAMENTO CONFIRMADO!*\n\n📅 Data: *${simState.data.day}*\n⏰ Horário: *${simState.data.time}*`;
-      if (simState.data.service) resumo += `\n✂️ Serviço: *${simState.data.service}*`;
-      resumo += `\n\nSeu horário já consta em nosso painel oficial. Te esperamos!\n\n_Digite *menu* para voltar ao início._`;
-      
-      addSimMessage(resumo, 'bot');
-      simState.active = false;
+  let currentPath = simPath;
+  let targetLevel = [...currentPath, choice];
+  let tempMenu = menuAtivo;
+  let item = null;
+
+  for (const idx of targetLevel) {
+    if (!tempMenu[idx]) { addSimMessage('❌ Opção inválida.', 'bot'); return; }
+    item = tempMenu[idx];
+    tempMenu = item.children || [];
   }
 
-  // Fluxo Menu Normal
-  if (simState.flow === 'menu') {
-      const choice = parseInt(body) - 1;
-      if (isNaN(choice) || choice < 0 || choice >= activeMenu.length) {
-        addSimMessage('❌ Opção inválida. Digite o número correspondente.', 'bot'); return;
-      }
-
-      let item = activeMenu[choice];
-
-      if (item.is_catalogo) {
-          let servText = mockServicos.map(s => `✔️ ${s}`).join('\n');
-          addSimMessage(`📋 *Nosso Catálogo*\n\n${servText}\n\n_Digite *menu* para voltar._`, 'bot');
-          simState.active = false; return;
-      }
-      
-      if (item.is_agendamento) {
-          simState.flow = 'schedule_day';
-          const days = getNextDaysListSim();
-          let daysText = days.map((d, i) => `*${i+1}.* ${d}`).join('\n');
-          addSimMessage(`📅 *Agendamento*\n\nPara qual dia você deseja agendar? (Próximos ${config.scheduling_days_ahead} dias)\n\n${daysText}\n\n_Digite o número correspondente:_`, 'bot');
-          return;
-      }
-
-      addSimMessage(item.final_response || 'Opção registrada.', 'bot');
-      addSimMessage('_Digite *menu* para voltar._', 'bot');
-      simState.active = false;
+  if (item.final_response || !item.children || item.children.length === 0) {
+    addSimMessage(item.final_response || 'Obrigado pelo contato!', 'bot');
+    addSimMessage('_Digite *menu* para voltar ao início._', 'bot');
+    simActive = false;
+  } else {
+    simPath = targetLevel;
+    addSimMessage(`*${item.text}*\n\n${buildMenuTextSim(item.children)}\n\n_Escolha uma opção:_`, 'bot');
   }
 }
 
-// ── Start ─────────────────────────────────────────────────────────────────
-connectWS(); loadConfig();
-fetch(`/bot-interno/api/bot/status?sessao=${sessao}`).then(r=>r.json()).then(d=> updateBotStatus(d.status));
+// ── Init ──────────────────────────────────────────────────────────────────
+connectWS();
+loadConfig();
+
+fetch(`/bot-interno/api/bot/status?sessao=${sessao}`).then(r => r.json()).then(d => {
+  if (d.status === 'connected') updateBotStatus('connected');
+  else if (d.status === 'waiting_qr') { if (d.qr) showQR(d.qr); else updateBotStatus('waiting_qr'); }
+  else if (d.status === 'starting' || d.status === 'running') updateBotStatus('waiting_qr');
+  else updateBotStatus('stopped');
+});
 </script>
 </body>
 </html>
