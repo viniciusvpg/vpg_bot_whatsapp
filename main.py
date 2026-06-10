@@ -142,13 +142,14 @@ def bot_status(sessao: str = "default"):
     return {"status": "stopped"}
 
 
-# ── Bot JS Generator ──────────────────────────────────────────────────────────
+# ── Bot JS Generator (Motor de Agendamento Nativo) ─────────────────────────────
 def generate_bot_js(sessao: str):
     config = load_config(sessao)
     menu_json = json.dumps(config["menu"], ensure_ascii=False)
     welcome = config["welcome_message"].replace("`", "\\`").replace('"', '\\"')
     show_products = str(config.get("show_products", False)).lower()
     enable_scheduling = str(config.get("enable_scheduling", False)).lower()
+    days_ahead = config.get("scheduling_days_ahead", 7)
     
     bot_code = f"""const {{ Client, LocalAuth }} = require('whatsapp-web.js');
 const qrcode = require('qrcode');
@@ -158,9 +159,14 @@ const ws = new WebSocket('ws://127.0.0.1:8000/ws/{sessao}');
 const menuBase = {menu_json};
 const userState = {{}}; 
 
-// Variáveis Dinâmicas
 const showProducts = {show_products};
 const enableScheduling = {enable_scheduling};
+const daysAhead = {days_ahead};
+
+// Mock de Integração com o seu Banco de Dados
+// No futuro, o Node fará uma requisição HTTP para o seu Flask buscar esses dados
+const mockHorarios = ['09:00', '10:00', '14:00', '15:30', '17:00'];
+const mockServicos = ['Corte Social', 'Barba Completa', 'Combo Corte + Barba', 'Platinado'];
 
 const client = new Client({{
   authStrategy: new LocalAuth({{ clientId: "client-{sessao}", dataPath: "./.wwebjs_auth_{sessao}" }}),
@@ -189,15 +195,23 @@ function buildMenuText(items) {{
   return items.map((item, idx) => `*${{idx + 1}}.* ${{item.text}}`).join('\\n');
 }}
 
-// Monta o Menu Dinâmico injetando Produtos e Agendamento se ativados
+function getNextDaysList() {{
+    let days = [];
+    let curr = new Date();
+    const week = ['Dom','Seg','Ter','Qua','Qui','Sex','Sáb'];
+    for(let i=1; i<=daysAhead; i++) {{
+        curr.setDate(curr.getDate() + 1);
+        let d = String(curr.getDate()).padStart(2, '0');
+        let m = String(curr.getMonth() + 1).padStart(2, '0');
+        days.push(`${{week[curr.getDay()]}} ${{d}}/${{m}}`);
+    }}
+    return days;
+}}
+
 function getActiveMenu() {{
     let activeMenu = JSON.parse(JSON.stringify(menuBase));
-    if (showProducts) {{
-        activeMenu.push({{ text: "Nossos Serviços e Produtos", is_catalogo: true }});
-    }}
-    if (enableScheduling) {{
-        activeMenu.push({{ text: "📅 Agendar Horário", is_agendamento: true }});
-    }}
+    if (showProducts) activeMenu.push({{ text: "📋 Nossos Serviços/Produtos", is_catalogo: true }});
+    if (enableScheduling) activeMenu.push({{ text: "📅 Agendar Horário", is_agendamento: true }});
     return activeMenu;
 }}
 
@@ -205,6 +219,7 @@ client.on('message', async (msg) => {{
   try {{
     const from = msg.from;
     const body = msg.body ? msg.body.trim() : "";
+    const textLower = body.toLowerCase();
 
     if (msg.fromMe || from === 'status@broadcast' || from.includes('@newsletter')) return;
 
@@ -212,23 +227,90 @@ client.on('message', async (msg) => {{
     try {{ chat = await msg.getChat(); }} catch (e) {{}}
     const send = async (text) => chat ? await chat.sendMessage(text) : await client.sendMessage(from, text);
 
-    const activeMenu = getActiveMenu();
-
-    if (body.toLowerCase() === 'menu' || body === '0') {{
-      userState[from] = {{ path: [], active: true }};
-      await send(`{welcome}\\n\\n${{buildMenuText(activeMenu)}}\\n\\n_Digite o número da opção desejada._`);
+    // Reinicia o fluxo sempre que digitar menu
+    if (textLower === 'menu' || textLower === 'oi' || body === '0') {{
+      userState[from] = {{ active: true, path: [], flow: 'menu' }};
+      await send(`{welcome}\\n\\n${{buildMenuText(getActiveMenu())}}\\n\\n_Digite o número da opção desejada._`);
       return;
     }}
 
     if (!userState[from] || !userState[from].active) {{
-      userState[from] = {{ path: [], active: true }};
-      await send(`{welcome}\\n\\n${{buildMenuText(activeMenu)}}\\n\\n_Como posso ajudar? Digite uma opção:_`);
+      userState[from] = {{ active: true, path: [], flow: 'menu' }};
+      await send(`{welcome}\\n\\n${{buildMenuText(getActiveMenu())}}\\n\\n_Como posso ajudar? Digite uma opção:_`);
       return;
     }}
 
+    // ==========================================
+    // MÁQUINA DE ESTADOS - AGENDAMENTO NATIVO
+    // ==========================================
+    if (userState[from].flow.startsWith('schedule_')) {{
+        const choice = parseInt(body) - 1;
+        
+        if (userState[from].flow === 'schedule_day') {{
+            const days = getNextDaysList();
+            if (isNaN(choice) || choice < 0 || choice >= days.length) {{
+                await send('❌ Opção inválida. Escolha um número da lista de dias.');
+                return;
+            }}
+            userState[from].selectedDay = days[choice];
+            userState[from].flow = 'schedule_time';
+            
+            let timeText = mockHorarios.map((h, i) => `*${{i+1}}.* ${{h}}`).join('\\n');
+            await send(`Você escolheu *${{days[choice]}}*.\\n\\nEstes são os horários disponíveis:\\n${{timeText}}\\n\\n_Digite o número do horário desejado:_`);
+            return;
+        }}
+
+        if (userState[from].flow === 'schedule_time') {{
+            if (isNaN(choice) || choice < 0 || choice >= mockHorarios.length) {{
+                await send('❌ Horário inválido. Escolha um número da lista.');
+                return;
+            }}
+            userState[from].selectedTime = mockHorarios[choice];
+            
+            if (showProducts) {{
+                userState[from].flow = 'schedule_service';
+                let servText = mockServicos.map((s, i) => `*${{i+1}}.* ${{s}}`).join('\\n');
+                await send(`Ótimo, horário reservado para *${{mockHorarios[choice]}}*.\\n\\nQual serviço você deseja realizar?\\n${{servText}}\\n\\n_Digite o número do serviço:_`);
+                return;
+            }} else {{
+                // Pula direto para a confirmação se serviços estiverem desativados
+                await finalizarAgendamento(from, send);
+                return;
+            }}
+        }}
+
+        if (userState[from].flow === 'schedule_service') {{
+            if (isNaN(choice) || choice < 0 || choice >= mockServicos.length) {{
+                await send('❌ Serviço inválido. Escolha um número da lista.');
+                return;
+            }}
+            userState[from].selectedService = mockServicos[choice];
+            await finalizarAgendamento(from, send);
+            return;
+        }}
+    }}
+
+    async function finalizarAgendamento(userFrom, sendFunc) {{
+        const s = userState[userFrom];
+        let resumo = `✅ *AGENDAMENTO CONFIRMADO!*\\n\\n📅 Data: *${{s.selectedDay}}*\\n⏰ Horário: *${{s.selectedTime}}*`;
+        if (s.selectedService) resumo += `\\n✂️ Serviço: *${{s.selectedService}}*`;
+        resumo += `\\n\\nSeu horário já consta em nosso painel oficial. Te esperamos!\\n\\n_Digite *menu* para voltar ao início._`;
+        
+        await sendFunc(resumo);
+        userState[userFrom].active = false;
+        
+        // AQUI VOCÊ FARÁ UM POST PARA O SEU FLASK:
+        // axios.post('https://seu-painel.com/api/registrar-agendamento', { data: s.selectedDay, hora: s.selectedTime, ... })
+    }}
+
+    // ==========================================
+    // FLUXO DO MENU PRINCIPAL
+    // ==========================================
+    const activeMenu = getActiveMenu();
     const choice = parseInt(body) - 1;
+    
     if (isNaN(choice) || choice < 0 || choice >= activeMenu.length && userState[from].path.length === 0) {{
-      await send('❌ Opção inválida. Digite o número ou *menu* para reiniciar.');
+      await send('❌ Opção inválida. Digite o número correspondente.');
       return;
     }}
 
@@ -243,19 +325,23 @@ client.on('message', async (msg) => {{
       tempMenu = item.children || [];
     }}
 
-    // Interceptadores de Funções Especiais
     if (item.is_catalogo) {{
-        await send("📋 *Nosso Catálogo de Serviços/Produtos*\\n\\n(Nota: No ambiente de produção, esta mensagem puxará os itens direto do seu banco de dados via API).\\n\\n_Digite *menu* para voltar._");
-        userState[from].active = false;
-        return;
-    }}
-    if (item.is_agendamento) {{
-        await send("📅 *Agendamento Inteligente*\\n\\nPara ver os horários disponíveis e agendar, acesse seu link exclusivo:\\n🔗 https://app.vpgsolucoes.com.br/agendar/cliente\\n\\n_Digite *menu* para voltar._");
+        let servText = mockServicos.map(s => `✔️ ${{s}}`).join('\\n');
+        await send(`📋 *Nosso Catálogo*\\n\\n${{servText}}\\n\\n_Digite *menu* para voltar._`);
         userState[from].active = false;
         return;
     }}
 
-    // Fluxo Normal
+    // INICIA O FLUXO DE AGENDAMENTO
+    if (item.is_agendamento) {{
+        userState[from].flow = 'schedule_day';
+        const days = getNextDaysList();
+        let daysText = days.map((d, i) => `*${{i+1}}.* ${{d}}`).join('\\n');
+        
+        await send(`📅 *Agendamento*\\n\\nPara qual dia você deseja agendar? (Próximos ${{daysAhead}} dias)\\n\\n${{daysText}}\\n\\n_Digite o número correspondente ao dia:_`);
+        return;
+    }}
+
     if (item.final_response || !item.children || item.children.length === 0) {{
       await send(item.final_response || 'Obrigado pelo contato!');
       await send('_Digite *menu* para voltar ao início._');
@@ -279,7 +365,7 @@ def read_bot_output(sessao: str):
     process = BOT_PROCESSES.get(sessao)
     if not process: return
     for line in process.stdout:
-        pass # Silenciando output no terminal para não poluir
+        pass 
 
 @app.get("/", response_class=HTMLResponse)
 def root():

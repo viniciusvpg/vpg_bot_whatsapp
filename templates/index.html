@@ -97,11 +97,26 @@
   .sim-input-area input { flex: 1; border-radius: 24px; background: var(--bg); border: 1px solid var(--border); padding: 12px 16px; color: white; outline: none; }
   .sim-input-area button { width: 44px; height: 44px; border-radius: 50%; background: var(--green); color: black; border: none; cursor: pointer; font-size: 18px; display: flex; align-items: center; justify-content: center; transition: 0.2s;}
 
+  /* Tab Sobre */
+  #tab-about { flex-direction: column; max-width: 720px; margin: 0 auto; width: 100%; padding: 32px 24px; gap: 20px; }
+  .about-header { background: linear-gradient(135deg, var(--green-dark), var(--green)); border-radius: var(--radius); padding: 32px; text-align: center; color: #000; }
+  .about-header h2 { font-family: 'Syne', sans-serif; font-size: 20px; font-weight: 800; margin-bottom: 6px; }
+  .about-header p { font-size: 13px; opacity: 0.75; font-weight: 600;}
+  .about-card { background: var(--surface); border: 1px solid var(--border); border-radius: var(--radius); padding: 24px; }
+  .about-card-title { font-family: 'Syne', sans-serif; font-size: 13px; font-weight: 700; text-transform: uppercase; letter-spacing: 1px; color: var(--text-muted); margin-bottom: 16px; display: flex; align-items: center; gap: 8px; }
+  .about-row { display: flex; align-items: center; gap: 12px; padding: 12px 0; border-bottom: 1px solid var(--border); font-size: 14px; }
+  .about-row:last-child { border-bottom: none; padding-bottom: 0;}
+  .about-row-label { color: var(--text-muted); width: 110px; flex-shrink: 0; font-size: 13px; }
+  .about-row-value { color: var(--text); font-weight: 600; }
+
   /* Utils */
   .toast { position: fixed; bottom: 24px; right: 24px; background: var(--surface); border: 1px solid var(--border); border-radius: 12px; padding: 14px 20px; display: flex; align-items: center; gap: 12px; font-size: 14px; font-weight: 500; z-index: 999; transform: translateY(100px); opacity: 0; transition: all 0.3s; }
   .toast.show { transform: translateY(0); opacity: 1; }
   .toast.success { border-color: rgba(37,211,102,0.4); }
   .info-box { background: rgba(37,211,102,0.08); border: 1px solid rgba(37,211,102,0.2); border-radius: 8px; padding: 12px 16px; font-size: 13px; color: var(--text-muted); line-height: 1.5; }
+  ::-webkit-scrollbar { width: 6px; }
+  ::-webkit-scrollbar-track { background: transparent; }
+  ::-webkit-scrollbar-thumb { background: var(--border); border-radius: 3px; }
 </style>
 </head>
 <body>
@@ -121,6 +136,7 @@
   <button class="tab-btn active" onclick="switchTab('connection')" id="tab-btn-connection"><i class="fa-solid fa-mobile-screen"></i> Conexão</button>
   <button class="tab-btn" onclick="switchTab('settings')" id="tab-btn-settings"><i class="fa-solid fa-gear"></i> Configurações</button>
   <button class="tab-btn" onclick="switchTab('simulator')" id="tab-btn-simulator"><i class="fa-regular fa-comment-dots"></i> Simulador</button>
+  <button class="tab-btn" onclick="switchTab('about')" id="tab-btn-about"><i class="fa-solid fa-circle-info"></i> Sobre</button>
 </div>
 
 <div class="tab-content active" id="tab-connection">
@@ -156,7 +172,7 @@
     </div>
     <div class="form-group">
       <label>Nome do Negócio</label>
-      <input type="text" id="businessName" placeholder="Ex: Barbearia do João">
+      <input type="text" id="businessName" placeholder="Ex: Barbearia do João" oninput="updateBusinessName()">
     </div>
     <div class="form-group">
       <label>Mensagem de Boas-vindas</label>
@@ -166,7 +182,7 @@
 
   <div class="settings-section" style="border-left: 4px solid var(--green);">
     <div class="section-header" style="margin-bottom: 0;">
-      <div class="section-title"><i class="fa-solid fa-calendar-check" style="color: var(--green);"></i> Agendamento Inteligente</div>
+      <div class="section-title"><i class="fa-solid fa-calendar-check" style="color: var(--green);"></i> Agendamento Nativo WhatsApp</div>
       <label class="switch">
         <input type="checkbox" id="toggleScheduling" onchange="toggleScheduleUI(this.checked)">
         <span class="slider round"></span>
@@ -174,18 +190,14 @@
     </div>
     <div id="schedulingPanel" style="display:none; padding-top: 16px; margin-top: 16px; border-top: 1px solid var(--border);">
       <p style="font-size: 13px; color: var(--text-muted); margin-bottom: 16px; line-height: 1.5;">
-        Adiciona a opção de Agendamento no menu do WhatsApp. O cliente receberá um link dinâmico para escolher horário na sua agenda oficial.
+        O bot perguntará o <strong>Dia</strong> e a <strong>Hora</strong> diretamente no chat e enviará o agendamento direto para a sua agenda no painel.
       </p>
       <div class="form-group" style="max-width: 300px;">
-        <label>Limitar agendamento para quantos dias à frente?</label>
+        <label>Disponibilizar agenda para quantos dias à frente?</label>
         <div style="display:flex; align-items:center; gap: 10px;">
           <input type="number" id="schedulingDays" min="1" max="60" value="7" style="width: 80px;">
           <span style="font-size: 14px; color: var(--text-muted);">dias corridos</span>
         </div>
-      </div>
-      <div class="schedule-preview">
-        <div class="schedule-badge"><i class="fa-regular fa-clock"></i> Horários Livres Hoje</div>
-        <div class="schedule-badge"><i class="fa-regular fa-calendar"></i> Agenda Sincronizada</div>
       </div>
     </div>
   </div>
@@ -200,23 +212,22 @@
     </div>
     <div id="productsPanel" style="display:none; padding-top: 16px; margin-top: 16px; border-top: 1px solid var(--border);">
       <p style="font-size: 13px; color: var(--text-muted); margin-bottom: 12px; line-height: 1.5;">
-        Adiciona a opção "Nossos Serviços" no menu. O robô irá puxar a lista de serviços que você já cadastrou no painel principal.
+        Adiciona a opção "Catálogo" no menu e também <strong>pergunta qual serviço o cliente deseja na hora de agendar</strong>.
       </p>
       <div class="products-list">
         <div class="product-badge"><i class="fa-solid fa-scissors"></i> Corte Social - R$ 40,00</div>
         <div class="product-badge"><i class="fa-solid fa-spray-can"></i> Barba Completa - R$ 35,00</div>
-        <div class="product-badge"><i class="fa-solid fa-fire"></i> Combo Corte + Barba - R$ 65,00</div>
       </div>
     </div>
   </div>
 
   <div class="settings-section">
     <div class="section-header">
-      <div class="section-title"><i class="fa-solid fa-sitemap"></i> Outras Opções de Menu (Manual)</div>
+      <div class="section-title"><i class="fa-solid fa-sitemap"></i> Outras Opções de Menu (Manuais)</div>
     </div>
     <div class="menu-tree" id="menuTree"></div>
     <div style="margin-top:10px">
-      <button class="add-root-btn" onclick="addRootItem()"><i class="fa-solid fa-plus"></i> Adicionar opção manual (ex: Localização, Contato)</button>
+      <button class="add-root-btn" onclick="addRootItem()"><i class="fa-solid fa-plus"></i> Adicionar opção manual (ex: Localização)</button>
     </div>
   </div>
 
@@ -228,7 +239,7 @@
 
 <div class="tab-content" id="tab-simulator">
   <div class="info-box" style="width: 100%; max-width: 420px; text-align: center;">
-    💡 <strong>Teste ao vivo!</strong> Se você ativou o Agendamento ou Serviços, mande um "Menu" para vê-los na prática.
+    💡 <strong>Teste ao vivo!</strong> Se o Agendamento estiver ativado, faça o fluxo completo abaixo.
   </div>
   
   <div class="sim-container">
@@ -247,6 +258,42 @@
   </div>
 </div>
 
+<div class="tab-content" id="tab-about">
+  <div class="about-header">
+    <h2>VPG Bot de Atendimento WhatsApp</h2>
+    <p>Sistema inteligente em nuvem</p>
+  </div>
+
+  <div class="about-card">
+    <div class="about-card-title"><i class="fa-solid fa-code"></i> Desenvolvedor e Suporte</div>
+    <div class="about-row">
+      <span class="about-row-label">Empresa</span>
+      <span class="about-row-value">VPG Soluções em Tecnologia</span>
+    </div>
+    <div class="about-row">
+      <span class="about-row-label">Responsável</span>
+      <span class="about-row-value">Vinícius Garcia</span>
+    </div>
+    <div class="about-row" style="border:none; padding-top: 16px;">
+      <a href="https://wa.me/5547992907248" target="_blank" class="btn btn-primary" style="width:100%; text-decoration:none;">
+        <i class="fa-brands fa-whatsapp fa-lg"></i> Falar com Suporte (WhatsApp)
+      </a>
+    </div>
+  </div>
+
+  <div class="about-card">
+    <div class="about-card-title"><i class="fa-solid fa-building-user"></i> Cliente Atual</div>
+    <div class="about-row">
+      <span class="about-row-label">Empresa</span>
+      <span class="about-row-value" id="sobreEmpresaLabel">Carregando...</span>
+    </div>
+    <div class="about-row">
+      <span class="about-row-label">Nível de Acesso</span>
+      <span class="about-row-value">Administrador do Painel</span>
+    </div>
+  </div>
+</div>
+
 <div class="toast" id="toast"><span id="toastIcon"></span><span id="toastMsg"></span></div>
 
 <script>
@@ -255,10 +302,6 @@ const sessao = urlParams.get('sessao') || 'default';
 
 let config = { business_name: '', welcome_message: '', menu: [], show_products: false, enable_scheduling: false, scheduling_days_ahead: 7 };
 let ws = null;
-
-// Simulador State
-let simActive = false;
-let simPath = [];
 
 function switchTab(name) {
   document.querySelectorAll('.tab-content').forEach(t => t.classList.remove('active'));
@@ -281,7 +324,7 @@ function showToast(msg, type = 'success') {
   setTimeout(() => toast.classList.remove('show'), 3000);
 }
 
-// ── Integração com Backend ────────────────────────────────────────────────
+// ── WebSocket & Controle do Bot ───────────────────────────────────────────
 function connectWS() {
   const proto = location.protocol === 'https:' ? 'wss' : 'ws';
   ws = new WebSocket(`${proto}://${location.host}/bot-interno/ws/${sessao}`);
@@ -342,15 +385,15 @@ async function restartBot() {
   setTimeout(() => startBot(), 1500);
 }
 
-// ── Configurações UI ──────────────────────────────────────────────────────
+// ── Configurações ─────────────────────────────────────────────────────────
 async function loadConfig() {
   const r = await fetch(`/bot-interno/api/config?sessao=${sessao}`);
   config = await r.json();
 
   document.getElementById('businessName').value = config.business_name || '';
   document.getElementById('welcomeMessage').value = config.welcome_message || '';
+  updateBusinessName();
   
-  // Toggles
   document.getElementById('toggleProducts').checked = config.show_products === true;
   toggleProductsUI(config.show_products === true);
   
@@ -369,13 +412,19 @@ async function saveConfig() {
   config.scheduling_days_ahead = parseInt(document.getElementById('schedulingDays').value) || 7;
 
   await fetch(`/bot-interno/api/config?sessao=${sessao}`, { method: 'POST', headers: { 'Content-Type': 'application/json' }, body: JSON.stringify(config) });
-  showToast('Salvo! Reinicie o bot para aplicar.', 'success');
+  showToast('Salvo com sucesso!', 'success');
+  updateBusinessName();
+}
+
+function updateBusinessName() {
+  const val = document.getElementById('businessName').value || 'Meu Negócio';
+  document.getElementById('sobreEmpresaLabel').textContent = val;
 }
 
 function toggleProductsUI(isChecked) { document.getElementById('productsPanel').style.display = isChecked ? 'block' : 'none'; }
 function toggleScheduleUI(isChecked) { document.getElementById('schedulingPanel').style.display = isChecked ? 'block' : 'none'; }
 
-// ── Menu Builder ──────────────────────────────────────────────────────────
+// ── Menu Manual Builder ───────────────────────────────────────────────────
 function generateId() { return Date.now().toString(36); }
 function escapeHtml(str) { return (str || '').replace(/&/g,'&amp;').replace(/</g,'&lt;').replace(/>/g,'&gt;'); }
 function toggleItem(el) { el.classList.toggle('open'); }
@@ -409,7 +458,21 @@ function createRootItem(item, index) {
 
 function addRootItem() { config.menu.push({ id: generateId(), text: 'Nova Opção', final_response: '' }); renderMenuTree(); }
 
-// ── Simulador de Chat com Lógica Dinâmica ─────────────────────────────────
+// ── Simulador com Máquina de Estados (Agendamento) ────────────────────────
+let simState = { active: false, flow: 'menu', data: {} };
+const mockHorarios = ['09:00', '10:00', '14:00', '15:30', '17:00'];
+const mockServicos = ['Corte Social', 'Barba Completa', 'Combo Corte + Barba', 'Platinado'];
+
+function getNextDaysListSim() {
+    let days = []; let curr = new Date(); const week = ['Dom','Seg','Ter','Qua','Qui','Sex','Sáb'];
+    for(let i=1; i<=config.scheduling_days_ahead; i++) {
+        curr.setDate(curr.getDate() + 1);
+        let d = String(curr.getDate()).padStart(2, '0'); let m = String(curr.getMonth() + 1).padStart(2, '0');
+        days.push(`${week[curr.getDay()]} ${d}/${m}`);
+    }
+    return days;
+}
+
 function addSimMessage(text, sender) {
   const chat = document.getElementById('simChat');
   const msgDiv = document.createElement('div');
@@ -421,7 +484,7 @@ function addSimMessage(text, sender) {
 
 function getActiveSimMenu() {
     let active = JSON.parse(JSON.stringify(config.menu || []));
-    if (config.show_products) active.push({ text: "Nossos Serviços / Catálogo", is_catalogo: true });
+    if (config.show_products) active.push({ text: "📋 Nossos Serviços/Produtos", is_catalogo: true });
     if (config.enable_scheduling) active.push({ text: "📅 Agendar Horário", is_agendamento: true });
     return active;
 }
@@ -441,38 +504,94 @@ function processSimMessage(body) {
   const menuText = activeMenu.map((m, i) => `*${i+1}.* ${m.text}`).join('\n');
 
   if (textLower === 'menu' || textLower === 'oi' || body === '0') {
-    simActive = true;
+    simState = { active: true, flow: 'menu', data: {} };
     addSimMessage(`${config.welcome_message}\n\n${menuText}\n\n_Digite o número da opção desejada._`, 'bot');
     return;
   }
 
-  if (!simActive) {
-    simActive = true;
+  if (!simState.active) {
+    simState = { active: true, flow: 'menu', data: {} };
     addSimMessage(`${config.welcome_message}\n\n${menuText}\n\n_Como posso ajudar? Digite uma opção:_`, 'bot');
     return;
   }
 
-  const choice = parseInt(body) - 1;
-  if (isNaN(choice) || choice < 0 || choice >= activeMenu.length) {
-    addSimMessage('❌ Opção inválida. Digite o número correspondente.', 'bot');
-    return;
+  // Máquina de Estados: Agendamento
+  if (simState.flow.startsWith('schedule_')) {
+      const choice = parseInt(body) - 1;
+      
+      if (simState.flow === 'schedule_day') {
+          const days = getNextDaysListSim();
+          if (isNaN(choice) || choice < 0 || choice >= days.length) {
+              addSimMessage('❌ Opção inválida. Escolha um número da lista.', 'bot'); return;
+          }
+          simState.data.day = days[choice];
+          simState.flow = 'schedule_time';
+          let timeText = mockHorarios.map((h, i) => `*${i+1}.* ${h}`).join('\n');
+          addSimMessage(`Você escolheu *${days[choice]}*.\n\nHorários disponíveis:\n${timeText}\n\n_Digite o número do horário:_`, 'bot');
+          return;
+      }
+
+      if (simState.flow === 'schedule_time') {
+          if (isNaN(choice) || choice < 0 || choice >= mockHorarios.length) {
+              addSimMessage('❌ Horário inválido. Escolha um número.', 'bot'); return;
+          }
+          simState.data.time = mockHorarios[choice];
+          
+          if (config.show_products) {
+              simState.flow = 'schedule_service';
+              let servText = mockServicos.map((s, i) => `*${i+1}.* ${s}`).join('\n');
+              addSimMessage(`Horário reservado para *${mockHorarios[choice]}*.\n\nQual serviço você deseja realizar?\n${servText}\n\n_Digite o número do serviço:_`, 'bot');
+              return;
+          } else {
+              finalizarSimulacao(); return;
+          }
+      }
+
+      if (simState.flow === 'schedule_service') {
+          if (isNaN(choice) || choice < 0 || choice >= mockServicos.length) {
+              addSimMessage('❌ Serviço inválido. Escolha um número.', 'bot'); return;
+          }
+          simState.data.service = mockServicos[choice];
+          finalizarSimulacao(); return;
+      }
   }
 
-  let item = activeMenu[choice];
-
-  if (item.is_catalogo) {
-      addSimMessage("📋 *Catálogo de Serviços*\n\n1. Corte Social - R$ 40,00\n2. Barba Completa - R$ 35,00\n3. Combo Corte + Barba - R$ 65,00\n\n_(Estes dados virão do seu sistema em tempo real)_\n\n_Digite *menu* para voltar._", 'bot');
-      simActive = false; return;
-  }
-  
-  if (item.is_agendamento) {
-      addSimMessage(`📅 *Agendamento Inteligente*\n\nNossa agenda está aberta para os próximos *${config.scheduling_days_ahead} dias*.\n\nPara escolher seu horário, acesse o link seguro abaixo:\n🔗 https://app.vpgsolucoes.com.br/agendar/cliente\n\n_Digite *menu* para voltar._`, 'bot');
-      simActive = false; return;
+  function finalizarSimulacao() {
+      let resumo = `✅ *AGENDAMENTO CONFIRMADO!*\n\n📅 Data: *${simState.data.day}*\n⏰ Horário: *${simState.data.time}*`;
+      if (simState.data.service) resumo += `\n✂️ Serviço: *${simState.data.service}*`;
+      resumo += `\n\nSeu horário já consta em nosso painel oficial. Te esperamos!\n\n_Digite *menu* para voltar ao início._`;
+      
+      addSimMessage(resumo, 'bot');
+      simState.active = false;
   }
 
-  addSimMessage(item.final_response || 'Opção registrada.', 'bot');
-  addSimMessage('_Digite *menu* para voltar._', 'bot');
-  simActive = false;
+  // Fluxo Menu Normal
+  if (simState.flow === 'menu') {
+      const choice = parseInt(body) - 1;
+      if (isNaN(choice) || choice < 0 || choice >= activeMenu.length) {
+        addSimMessage('❌ Opção inválida. Digite o número correspondente.', 'bot'); return;
+      }
+
+      let item = activeMenu[choice];
+
+      if (item.is_catalogo) {
+          let servText = mockServicos.map(s => `✔️ ${s}`).join('\n');
+          addSimMessage(`📋 *Nosso Catálogo*\n\n${servText}\n\n_Digite *menu* para voltar._`, 'bot');
+          simState.active = false; return;
+      }
+      
+      if (item.is_agendamento) {
+          simState.flow = 'schedule_day';
+          const days = getNextDaysListSim();
+          let daysText = days.map((d, i) => `*${i+1}.* ${d}`).join('\n');
+          addSimMessage(`📅 *Agendamento*\n\nPara qual dia você deseja agendar? (Próximos ${config.scheduling_days_ahead} dias)\n\n${daysText}\n\n_Digite o número correspondente:_`, 'bot');
+          return;
+      }
+
+      addSimMessage(item.final_response || 'Opção registrada.', 'bot');
+      addSimMessage('_Digite *menu* para voltar._', 'bot');
+      simState.active = false;
+  }
 }
 
 // ── Start ─────────────────────────────────────────────────────────────────
