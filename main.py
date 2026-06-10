@@ -30,7 +30,9 @@ class BotConfig(BaseModel):
     business_logo: Optional[str] = None
     welcome_message: str
     menu: List[MenuItem]
-    show_products: bool = False  # <-- NOVA CHAVE AQUI
+    show_products: bool = False
+    enable_scheduling: bool = False
+    scheduling_days_ahead: int = 7
 
 # ── Helpers (ISOLADOS POR SESSÃO) ─────────────────────────────────────────────
 def get_data_file(sessao: str) -> str:
@@ -46,7 +48,9 @@ def load_config(sessao: str) -> dict:
         "business_logo": "",
         "welcome_message": "Olá! Bem-vindo. Como posso ajudar?",
         "menu": [],
-        "show_products": False 
+        "show_products": False,
+        "enable_scheduling": False,
+        "scheduling_days_ahead": 7
     }
 
 def save_config(sessao: str, config: dict):
@@ -62,7 +66,7 @@ async def broadcast(sessao: str, message: dict):
             except:
                 connected_clients[sessao].remove(ws)
 
-# ── WebSocket para QR code (ISOLADO POR SESSÃO) ───────────────────────────────
+# ── WebSocket para QR code ───────────────────────────────────────────────────
 @app.websocket("/ws/{sessao}")
 async def websocket_endpoint(websocket: WebSocket, sessao: str):
     await websocket.accept()
@@ -74,7 +78,6 @@ async def websocket_endpoint(websocket: WebSocket, sessao: str):
             data = await websocket.receive_text()
             message = json.loads(data)
             
-            # SALVANDO NA MEMÓRIA DO SERVIDOR
             if message.get("type") == "bot_status":
                 BOT_STATES[sessao] = message.get("status")
             elif message.get("type") == "qr":
@@ -87,11 +90,10 @@ async def websocket_endpoint(websocket: WebSocket, sessao: str):
         if websocket in connected_clients[sessao]:
             connected_clients[sessao].remove(websocket)
     except Exception as e:
-        print(f"Erro no WebSocket da sessão {sessao}: {e}")
         if websocket in connected_clients[sessao]:
             connected_clients[sessao].remove(websocket)
 
-# ── API Routes (COM PARÂMETRO SESSÃO) ─────────────────────────────────────────
+# ── API Routes ────────────────────────────────────────────────────────────────
 @app.get("/api/config")
 def get_config(sessao: str = "default"):
     return load_config(sessao)
@@ -140,39 +142,34 @@ def bot_status(sessao: str = "default"):
     return {"status": "stopped"}
 
 
-# ── Bot JS Generator (ISOLADO POR SESSÃO) ─────────────────────────────────────
+# ── Bot JS Generator ──────────────────────────────────────────────────────────
 def generate_bot_js(sessao: str):
     config = load_config(sessao)
     menu_json = json.dumps(config["menu"], ensure_ascii=False)
     welcome = config["welcome_message"].replace("`", "\\`").replace('"', '\\"')
+    show_products = str(config.get("show_products", False)).lower()
+    enable_scheduling = str(config.get("enable_scheduling", False)).lower()
     
     bot_code = f"""const {{ Client, LocalAuth }} = require('whatsapp-web.js');
 const qrcode = require('qrcode');
 const WebSocket = require('ws');
 
 const ws = new WebSocket('ws://127.0.0.1:8000/ws/{sessao}');
-const menu = {menu_json};
+const menuBase = {menu_json};
 const userState = {{}}; 
 
+// Variáveis Dinâmicas
+const showProducts = {show_products};
+const enableScheduling = {enable_scheduling};
+
 const client = new Client({{
-  authStrategy: new LocalAuth({{
-    clientId: "client-{sessao}",
-    dataPath: "./.wwebjs_auth_{sessao}"
-  }}),
+  authStrategy: new LocalAuth({{ clientId: "client-{sessao}", dataPath: "./.wwebjs_auth_{sessao}" }}),
   authTimeoutMs: 0,
   puppeteer: {{ 
     executablePath: '/usr/bin/google-chrome-stable',
     headless: true,
     protocolTimeout: 0,
-    args: [
-      '--no-sandbox', 
-      '--disable-setuid-sandbox',
-      '--disable-dev-shm-usage',
-      '--disable-accelerated-2d-canvas',
-      '--no-first-run',
-      '--no-zygote',
-      '--disable-gpu'
-    ]
+    args: ['--no-sandbox', '--disable-setuid-sandbox', '--disable-dev-shm-usage', '--disable-accelerated-2d-canvas', '--no-first-run', '--no-zygote', '--disable-gpu']
   }}
 }});
 
@@ -180,9 +177,7 @@ client.on('qr', async (qr) => {{
   try {{
     const qrDataUrl = await qrcode.toDataURL(qr);
     if (ws.readyState === WebSocket.OPEN) ws.send(JSON.stringify({{ type: 'qr', data: qrDataUrl }}));
-  }} catch (err) {{
-    console.error('Erro no QR:', err);
-  }}
+  }} catch (err) {{}}
 }});
 
 client.on('ready', () => {{
@@ -194,54 +189,73 @@ function buildMenuText(items) {{
   return items.map((item, idx) => `*${{idx + 1}}.* ${{item.text}}`).join('\\n');
 }}
 
+// Monta o Menu Dinâmico injetando Produtos e Agendamento se ativados
+function getActiveMenu() {{
+    let activeMenu = JSON.parse(JSON.stringify(menuBase));
+    if (showProducts) {{
+        activeMenu.push({{ text: "Nossos Serviços e Produtos", is_catalogo: true }});
+    }}
+    if (enableScheduling) {{
+        activeMenu.push({{ text: "📅 Agendar Horário", is_agendamento: true }});
+    }}
+    return activeMenu;
+}}
+
 client.on('message', async (msg) => {{
   try {{
     const from = msg.from;
     const body = msg.body ? msg.body.trim() : "";
 
-    if (msg.fromMe) return;
-    if (from === 'status@broadcast' || from.includes('@newsletter')) return;
+    if (msg.fromMe || from === 'status@broadcast' || from.includes('@newsletter')) return;
 
     let chat;
     try {{ chat = await msg.getChat(); }} catch (e) {{}}
+    const send = async (text) => chat ? await chat.sendMessage(text) : await client.sendMessage(from, text);
 
-    const send = async (text) => {{
-      if (chat) return await chat.sendMessage(text);
-      return await client.sendMessage(from, text);
-    }};
+    const activeMenu = getActiveMenu();
 
     if (body.toLowerCase() === 'menu' || body === '0') {{
       userState[from] = {{ path: [], active: true }};
-      await send(`{welcome}\\n\\n${{buildMenuText(menu)}}\\n\\n_Digite o número da opção desejada._`);
+      await send(`{welcome}\\n\\n${{buildMenuText(activeMenu)}}\\n\\n_Digite o número da opção desejada._`);
       return;
     }}
 
     if (!userState[from] || !userState[from].active) {{
       userState[from] = {{ path: [], active: true }};
-      await send(`{welcome}\\n\\n${{buildMenuText(menu)}}\\n\\n_Como posso ajudar? Digite uma opção:_`);
+      await send(`{welcome}\\n\\n${{buildMenuText(activeMenu)}}\\n\\n_Como posso ajudar? Digite uma opção:_`);
       return;
     }}
 
     const choice = parseInt(body) - 1;
-    if (isNaN(choice) || choice < 0) {{
+    if (isNaN(choice) || choice < 0 || choice >= activeMenu.length && userState[from].path.length === 0) {{
       await send('❌ Opção inválida. Digite o número ou *menu* para reiniciar.');
       return;
     }}
 
     let currentPath = userState[from].path;
     let targetLevel = [...currentPath, choice];
-    let tempMenu = menu;
+    let tempMenu = activeMenu;
     let item = null;
 
     for (const idx of targetLevel) {{
-      if (!tempMenu[idx]) {{
-        await send('❌ Opção inválida.');
-        return;
-      }}
+      if (!tempMenu[idx]) {{ await send('❌ Opção inválida.'); return; }}
       item = tempMenu[idx];
       tempMenu = item.children || [];
     }}
 
+    // Interceptadores de Funções Especiais
+    if (item.is_catalogo) {{
+        await send("📋 *Nosso Catálogo de Serviços/Produtos*\\n\\n(Nota: No ambiente de produção, esta mensagem puxará os itens direto do seu banco de dados via API).\\n\\n_Digite *menu* para voltar._");
+        userState[from].active = false;
+        return;
+    }}
+    if (item.is_agendamento) {{
+        await send("📅 *Agendamento Inteligente*\\n\\nPara ver os horários disponíveis e agendar, acesse seu link exclusivo:\\n🔗 https://app.vpgsolucoes.com.br/agendar/cliente\\n\\n_Digite *menu* para voltar._");
+        userState[from].active = false;
+        return;
+    }}
+
+    // Fluxo Normal
     if (item.final_response || !item.children || item.children.length === 0) {{
       await send(item.final_response || 'Obrigado pelo contato!');
       await send('_Digite *menu* para voltar ao início._');
@@ -265,7 +279,7 @@ def read_bot_output(sessao: str):
     process = BOT_PROCESSES.get(sessao)
     if not process: return
     for line in process.stdout:
-        print(f"[BOT {sessao}] {line.strip()}")
+        pass # Silenciando output no terminal para não poluir
 
 @app.get("/", response_class=HTMLResponse)
 def root():
