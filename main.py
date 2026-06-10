@@ -272,8 +272,7 @@ client.on('message', async (msg) => {{
                 await send(`Ótimo, horário reservado para *${{mockHorarios[choice]}}*.\\n\\nQual serviço você deseja realizar?\\n${{servText}}\\n\\n_Digite o número do serviço:_`);
                 return;
             }} else {{
-                // Pula direto para a confirmação se serviços estiverem desativados
-                await finalizarAgendamento(from, send);
+                await checkCadastro(from, send);
                 return;
             }}
         }}
@@ -284,9 +283,65 @@ client.on('message', async (msg) => {{
                 return;
             }}
             userState[from].selectedService = mockServicos[choice];
+            await checkCadastro(from, send);
+            return;
+        }}
+
+        if (userState[from].flow === 'schedule_cadastro') {{
+            userState[from].nome = body; // Salva o nome digitado pelo cliente
             await finalizarAgendamento(from, send);
             return;
         }}
+    }}
+
+    // VERIFICA SE A CLIENTE TEM CADASTRO NO FLASK
+    async function checkCadastro(userFrom, sendFunc) {{
+        await sendFunc("⏳ Só um momento, estou verificando a sua ficha na nossa recepção...");
+        try {{
+            // ATENÇÃO: Confirme se este é o link correto do seu Flask
+            const res = await fetch('https://app.vpgsolucoes.com.br/api/bot/check-cliente', {{
+                method: 'POST',
+                headers: {{'Content-Type': 'application/json'}},
+                body: JSON.stringify({{ whatsapp: userFrom, estabelecimento_id: '{sessao}' }})
+            }});
+            const data = await res.json();
+
+            if (data.registrado) {{
+                userState[userFrom].nome = data.nome;
+                await finalizarAgendamento(userFrom, sendFunc);
+            }} else {{
+                userState[userFrom].flow = 'schedule_cadastro';
+                await sendFunc("Notei que ainda não tem cadastro com a gente, apenas informe seu *Nome e Sobrenome* para o cadastro:");
+            }}
+        }} catch (err) {{
+            // Se der erro de comunicação, prossegue sem o nome para não travar o cliente
+            await finalizarAgendamento(userFrom, sendFunc);
+        }}
+    }}
+
+    // FINALIZA E ENVIA PARA O PAINEL OFICIAL
+    async function finalizarAgendamento(userFrom, sendFunc) {{
+        const s = userState[userFrom];
+        let resumo = `✅ *AGENDAMENTO CONFIRMADO!*\\n\\n👤 Cliente: *${{s.nome || 'Não informado'}}*\\n📅 Data: *${{s.selectedDay}}*\\n⏰ Horário: *${{s.selectedTime}}*`;
+        if (s.selectedService) resumo += `\\n✂️ Serviço: *${{s.selectedService}}*`;
+        resumo += `\\n\\nSeu horário já consta em nosso painel oficial. Te esperamos!\\n\\n_Digite *menu* para voltar ao início._`;
+        
+        await sendFunc(resumo);
+        userState[userFrom].active = false;
+        
+        // DISPARA OS DADOS PARA O SEU FLASK GRAVAR NO BANCO
+        fetch('https://app.vpgsolucoes.com.br/api/bot/registrar-agendamento', {{
+            method: 'POST',
+            headers: {{'Content-Type': 'application/json'}},
+            body: JSON.stringify({{
+                whatsapp: userFrom,
+                nome: s.nome,
+                servico: s.selectedService,
+                data: s.selectedDay,
+                hora: s.selectedTime,
+                estabelecimento_id: '{sessao}'
+            }})
+        }}).catch(err => console.log('Erro ao salvar no painel:', err));
     }}
 
     async function finalizarAgendamento(userFrom, sendFunc) {{
