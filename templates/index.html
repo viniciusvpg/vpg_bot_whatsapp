@@ -358,23 +358,67 @@ function updateBotStatus(status) {
     document.getElementById('qrLoading').style.display = 'none';
     document.getElementById('qrImage').style.display = 'none';
     document.getElementById('qrConnected').style.display = 'flex';
-    start.style.display = 'none'; restart.style.display = 'inline-flex'; stop.style.display = 'inline-flex';
+    
+    start.style.display = 'none'; 
+    restart.style.display = 'inline-flex'; 
+    stop.style.display = 'inline-flex';
   } else if (status === 'waiting_qr' || status === 'starting') {
-    dot.classList.add('connecting'); text.textContent = 'Aguardando QR';
-    start.style.display = 'none'; restart.style.display = 'inline-flex'; stop.style.display = 'inline-flex';
+    dot.classList.add('connecting'); 
+    text.textContent = status === 'starting' ? 'Iniciando...' : 'Aguardando QR';
+    
+    if (status === 'starting') {
+      document.getElementById('qrPlaceholder').style.display = 'none';
+      document.getElementById('qrLoading').style.display = 'flex';
+      document.getElementById('qrImage').style.display = 'none';
+      document.getElementById('qrConnected').style.display = 'none';
+    }
+    
+    start.style.display = 'none'; 
+    restart.style.display = 'inline-flex'; 
+    stop.style.display = 'inline-flex';
   } else {
     text.textContent = 'Desconectado';
     document.getElementById('qrPlaceholder').style.display = 'flex';
+    document.getElementById('qrLoading').style.display = 'none';
     document.getElementById('qrImage').style.display = 'none';
     document.getElementById('qrConnected').style.display = 'none';
-    start.style.display = 'inline-flex'; restart.style.display = 'none'; stop.style.display = 'none';
+    
+    start.style.display = 'inline-flex'; 
+    start.disabled = false; // Destrava o botão caso tenha travado
+    restart.style.display = 'none'; 
+    stop.style.display = 'none';
   }
 }
 
 async function startBot() {
+  // 1. Esconde as coisas e mostra o loading
   document.getElementById('qrPlaceholder').style.display = 'none';
   document.getElementById('qrLoading').style.display = 'flex';
-  await fetch(`/bot-interno/api/bot/start?sessao=${sessao}`, { method: 'POST' });
+  
+  // 2. Trava o botão para não clicar duas vezes
+  document.getElementById('btnStart').disabled = true;
+  document.getElementById('btnStart').innerHTML = '<i class="fa-solid fa-spinner fa-spin"></i> Iniciando...';
+
+  try {
+    const r = await fetch(`/bot-interno/api/bot/start?sessao=${sessao}`, { method: 'POST' });
+    const d = await r.json();
+
+    if (d.status === 'error') {
+      showToast(d.message, 'error');
+      document.getElementById('btnStart').disabled = false;
+      document.getElementById('btnStart').innerHTML = '<i class="fa-solid fa-play"></i> Iniciar Bot';
+      document.getElementById('qrLoading').style.display = 'none';
+      document.getElementById('qrPlaceholder').style.display = 'flex';
+    } else {
+      // Se deu certo, atualiza o status visual
+      updateBotStatus('starting');
+      document.getElementById('btnStart').innerHTML = '<i class="fa-solid fa-play"></i> Iniciar Bot';
+    }
+  } catch (err) {
+    showToast('Erro ao ligar. O servidor não respondeu.', 'error');
+    document.getElementById('btnStart').disabled = false;
+    document.getElementById('btnStart').innerHTML = '<i class="fa-solid fa-play"></i> Iniciar Bot';
+  }
 }
 
 async function stopBot() { await fetch(`/bot-interno/api/bot/stop?sessao=${sessao}`, { method: 'POST' }); updateBotStatus('stopped'); }
