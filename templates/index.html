@@ -597,51 +597,70 @@ function processSimMessage(body) {
   if (simState.flow.startsWith('schedule_')) {
       const choice = parseInt(body) - 1;
       
-      if (simState.flow === 'schedule_day') {
-          const days = getNextDaysListSim();
-          if (isNaN(choice) || choice < 0 || choice >= days.length) {
-              addSimMessage('❌ Opção inválida. Escolha um número da lista.', 'bot'); return;
-          }
-          simState.data.day = days[choice];
-          simState.flow = 'schedule_time';
-          let timeText = mockHorarios.map((h, i) => `*${i+1}.* ${h}`).join('\n');
-          addSimMessage(`Você escolheu *${days[choice]}*.\n\nHorários disponíveis:\n${timeText}\n\n_Digite o número do horário:_`, 'bot');
-          return;
-      }
-
-      if (simState.flow === 'schedule_time') {
-          if (isNaN(choice) || choice < 0 || choice >= mockHorarios.length) {
-              addSimMessage('❌ Horário inválido. Escolha um número.', 'bot'); return;
-          }
-          simState.data.time = mockHorarios[choice];
-          
-          if (config.show_products) {
-              simState.flow = 'schedule_service';
-              let servText = servicosCadastrados.map((s, i) => `*${i+1}.* ${s}`).join('\n');
-              addSimMessage(`Horário reservado para *${mockHorarios[choice]}*.\n\nQual serviço você deseja realizar?\n${servText}\n\n_Digite o número do serviço:_`, 'bot');
-              return;
-          } else {
-              finalizarSimulacao(); return;
-          }
-      }
-
+      // Estado 1: Simulador escolhe Serviço
       if (simState.flow === 'schedule_service') {
           if (isNaN(choice) || choice < 0 || choice >= servicosCadastrados.length) {
               addSimMessage('❌ Serviço inválido. Escolha um número.', 'bot'); return;
           }
-          simState.data.service = servicosCadastrados[choice].split(' - R$')[0];
+          const serv = servicosCadastrados[choice];
+          simState.data.service = serv.nome;
+          simState.data.serviceId = serv.id;
+          
+          simState.flow = 'schedule_day';
+          const days = getNextDaysListSim();
+          let daysText = days.map((d, i) => `*${i+1}.* ${d}`).join('\n');
+          addSimMessage(`Você escolheu *${serv.nome}*.\n\nPara qual dia você deseja agendar?\n\n${daysText}\n\n_Digite o número do dia:_`, 'bot');
+          return;
+      }
+
+      // Estado 2: Simulador escolhe Dia
+      if (simState.flow === 'schedule_day') {
+          const days = getNextDaysListSim();
+          if (isNaN(choice) || choice < 0 || choice >= days.length) {
+              addSimMessage('❌ Opção inválida. Escolha um número.', 'bot'); return;
+          }
+          simState.data.day = days[choice];
+          
+          // No simulador, vamos fazer o fetch real para a API também!
+          fetch('https://app.vpgsolucoes.com.br/api/bot/horarios-livres', {
+                method: 'POST',
+                headers: {'Content-Type': 'application/json'},
+                body: JSON.stringify({ 
+                    estabelecimento_id: sessao,
+                    servico_id: simState.data.serviceId,
+                    data: simState.data.day
+                })
+          }).then(r => r.json()).then(data => {
+              if(!data.horarios || data.horarios.length === 0) {
+                  addSimMessage(`Não temos horários para *${simState.data.day}* com tempo suficiente.\nDigite *menu* para voltar.`, 'bot');
+                  simState.active = false; return;
+              }
+              simState.horariosDisponiveis = data.horarios;
+              simState.flow = 'schedule_time';
+              let timeText = data.horarios.map((h, i) => `*${i+1}.* ${h}`).join('\n');
+              addSimMessage(`Horários livres para *${simState.data.day}*:\n\n${timeText}\n\n_Digite o número do horário:_`, 'bot');
+          });
+          return;
+      }
+
+      // Estado 3: Simulador escolhe Hora
+      if (simState.flow === 'schedule_time') {
+          const horarios = simState.horariosDisponiveis;
+          if (isNaN(choice) || choice < 0 || choice >= horarios.length) {
+              addSimMessage('❌ Horário inválido.', 'bot'); return;
+          }
+          simState.data.time = horarios[choice];
           finalizarSimulacao(); return;
       }
   }
 
   function finalizarSimulacao() {
-      let resumo = `✅ *AGENDAMENTO CONFIRMADO!*\n\n📅 Data: *${simState.data.day}*\n⏰ Horário: *${simState.data.time}*`;
-      if (simState.data.service) resumo += `\n✂️ Serviço: *${simState.data.service}*`;
-      resumo += `\n\nSeu horário já consta em nosso painel oficial. Te esperamos!\n\n_Digite *menu* para voltar ao início._`;
-      
+      let resumo = `✅ *AGENDAMENTO CONFIRMADO!*\n\n✂️ Serviço: *${simState.data.service}*\n📅 Data: *${simState.data.day}*\n⏰ Horário: *${simState.data.time}*`;
+      resumo += `\n\nJá anotei na agenda oficial. Te esperamos!\n\n_Digite *menu* para voltar ao início._`;
       addSimMessage(resumo, 'bot');
       simState.active = false;
   }
+    
 
   // Fluxo Menu Normal
   if (simState.flow === 'menu') {
@@ -659,10 +678,13 @@ function processSimMessage(body) {
       }
       
       if (item.is_agendamento) {
-          simState.flow = 'schedule_day';
-          const days = getNextDaysListSim();
-          let daysText = days.map((d, i) => `*${i+1}.* ${d}`).join('\n');
-          addSimMessage(`📅 *Agendamento*\n\nPara qual dia você deseja agendar? (Próximos ${config.scheduling_days_ahead} dias)\n\n${daysText}\n\n_Digite o número correspondente:_`, 'bot');
+          if (servicosCadastrados.length === 0) {
+              addSimMessage('❌ Sem serviços para agendar.', 'bot');
+              simState.active = false; return;
+          }
+          simState.flow = 'schedule_service';
+          let servText = servicosCadastrados.map((s, i) => `*${i+1}.* ${s.nome} - R$ ${s.valor.toFixed(2).replace('.', ',')}`).join('\n');
+          addSimMessage(`📅 *Agendamento*\n\nQual serviço você deseja realizar?\n\n${servText}\n\n_Digite o número:_`, 'bot');
           return;
       }
 

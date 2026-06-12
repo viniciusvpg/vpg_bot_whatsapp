@@ -164,20 +164,15 @@ const enableScheduling = {enable_scheduling};
 const daysAhead = {days_ahead};
 
 let servicosCadastrados = [];
-const mockHorarios = ['09:00', '10:00', '14:00', '15:30', '17:00']; // (Os horarios ainda simulamos, precisariamos de uma logica maior para dias/horarios reais)
 
-// FUNÇÃO PARA BUSCAR OS SERVIÇOS NO SEU PAINEL FLASK ANTES DO BOT RESPONDER
 async function fetchServicos() {{
     try {{
-        const res = await fetch(`https://app.vpgsolucoes.com.br/api/bot/servicos?estabelecimento_id={{sessao}}`);
+        const res = await fetch(`https://app.vpgsolucoes.com.br/api/bot/servicos?estabelecimento_id={sessao}`);
         const data = await res.json();
         if(data && data.servicos) {{
-            servicosCadastrados = data.servicos.map(s => `${{s.nome}} - R$ ${{s.valor.toFixed(2)}}`);
+            servicosCadastrados = data.servicos;
         }}
-    }} catch(err) {{
-        console.error("Erro ao buscar serviços:", err);
-        servicosCadastrados = ['Serviço Padrão (Falha ao carregar)'];
-    }}
+    }} catch(err) {{ console.error("Erro:", err); }}
 }}
 
 const client = new Client({{
@@ -241,22 +236,42 @@ client.on('message', async (msg) => {{
 
     if (textLower === 'menu' || textLower === 'oi' || body === '0') {{
       userState[from] = {{ active: true, path: [], flow: 'menu' }};
+      if(showProducts) await fetchServicos(); 
       await send(`{welcome}\\n\\n${{buildMenuText(getActiveMenu())}}\\n\\n_Digite o número da opção desejada._`);
       return;
     }}
 
     if (!userState[from] || !userState[from].active) {{
       userState[from] = {{ active: true, path: [], flow: 'menu' }};
+      if(showProducts) await fetchServicos();
       await send(`{welcome}\\n\\n${{buildMenuText(getActiveMenu())}}\\n\\n_Como posso ajudar? Digite uma opção:_`);
       return;
     }}
 
     // ==========================================
-    // MÁQUINA DE ESTADOS - AGENDAMENTO NATIVO
+    // MÁQUINA DE ESTADOS - O NOVO FLUXO!
     // ==========================================
     if (userState[from].flow.startsWith('schedule_')) {{
         const choice = parseInt(body) - 1;
         
+        // ESTADO 1: Escolhendo o Serviço
+        if (userState[from].flow === 'schedule_service') {{
+            if (isNaN(choice) || choice < 0 || choice >= servicosCadastrados.length) {{
+                await send('❌ Serviço inválido. Escolha um número da lista.');
+                return;
+            }}
+            const servicoObj = servicosCadastrados[choice];
+            userState[from].selectedService = servicoObj.nome;
+            userState[from].selectedServiceId = servicoObj.id;
+            
+            userState[from].flow = 'schedule_day';
+            const days = getNextDaysList();
+            let daysText = days.map((d, i) => `*${{i+1}}.* ${{d}}`).join('\\n');
+            await send(`Você escolheu *${{servicoObj.nome}}*.\\n\\nPara qual dia você deseja agendar?\\n\\n${{daysText}}\\n\\n_Digite o número correspondente ao dia:_`);
+            return;
+        }}
+
+        // ESTADO 2: Escolhendo o Dia
         if (userState[from].flow === 'schedule_day') {{
             const days = getNextDaysList();
             if (isNaN(choice) || choice < 0 || choice >= days.length) {{
@@ -264,41 +279,52 @@ client.on('message', async (msg) => {{
                 return;
             }}
             userState[from].selectedDay = days[choice];
-            userState[from].flow = 'schedule_time';
             
-            let timeText = mockHorarios.map((h, i) => `*${{i+1}}.* ${{h}}`).join('\\n');
-            await send(`Você escolheu *${{days[choice]}}*.\\n\\nEstes são os horários disponíveis:\\n${{timeText}}\\n\\n_Digite o número do horário desejado:_`);
+            // BUSCA HORÁRIOS LIVRES REAIS NO PAINEL
+            await send("⏳ Cruzando sua escolha com nossa agenda oficial...");
+            try {{
+                const res = await fetch('https://app.vpgsolucoes.com.br/api/bot/horarios-livres', {{
+                    method: 'POST',
+                    headers: {{'Content-Type': 'application/json'}},
+                    body: JSON.stringify({{ 
+                        estabelecimento_id: '{sessao}',
+                        servico_id: userState[from].selectedServiceId,
+                        data: userState[from].selectedDay
+                    }})
+                }});
+                const data = await res.json();
+                
+                if (!data.horarios || data.horarios.length === 0) {{
+                    await send(`Poxa, não temos horários com tempo suficiente para esse serviço no dia *${{userState[from].selectedDay}}*.\\n\\nDigite *menu* e tente escolher outro dia.`);
+                    userState[from].active = false;
+                    return;
+                }}
+                
+                userState[from].horariosDisponiveis = data.horarios;
+                userState[from].flow = 'schedule_time';
+                
+                let timeText = data.horarios.map((h, i) => `*${{i+1}}.* ${{h}}`).join('\\n');
+                await send(`Temos estes horários disponíveis para *${{userState[from].selectedDay}}*:\\n\\n${{timeText}}\\n\\n_Digite o número do horário desejado:_`);
+            }} catch(err) {{
+                await send("❌ Erro ao consultar agenda. Tente mais tarde.");
+                userState[from].active = false;
+            }}
             return;
         }}
 
+        // ESTADO 3: Escolhendo a Hora
         if (userState[from].flow === 'schedule_time') {{
-            if (isNaN(choice) || choice < 0 || choice >= mockHorarios.length) {{
+            const horarios = userState[from].horariosDisponiveis;
+            if (isNaN(choice) || choice < 0 || choice >= horarios.length) {{
                 await send('❌ Horário inválido. Escolha um número da lista.');
                 return;
             }}
-            userState[from].selectedTime = mockHorarios[choice];
-            
-            if (showProducts) {{
-                userState[from].flow = 'schedule_service';
-                let servText = mockServicos.map((s, i) => `*${{i+1}}.* ${{s}}`).join('\\n');
-                await send(`Ótimo, horário reservado para *${{mockHorarios[choice]}}*.\\n\\nQual serviço você deseja realizar?\\n${{servText}}\\n\\n_Digite o número do serviço:_`);
-                return;
-            }} else {{
-                await checkCadastro(from, send);
-                return;
-            }}
-        }}
-
-        if (userState[from].flow === 'schedule_service') {{
-            if (isNaN(choice) || choice < 0 || choice >= mockServicos.length) {{
-                await send('❌ Serviço inválido. Escolha um número da lista.');
-                return;
-            }}
-            userState[from].selectedService = mockServicos[choice];
+            userState[from].selectedTime = horarios[choice];
             await checkCadastro(from, send);
             return;
         }}
 
+        // ESTADO 4: Cadastrando Nome (se for novo)
         if (userState[from].flow === 'schedule_cadastro') {{
             userState[from].nome = body;
             await finalizarAgendamento(from, send);
@@ -307,7 +333,7 @@ client.on('message', async (msg) => {{
     }}
 
     async function checkCadastro(userFrom, sendFunc) {{
-        await sendFunc("⏳ Só um momento, estou verificando a sua ficha na nossa recepção...");
+        await sendFunc("⏳ Só um momento, estou preparando sua reserva...");
         try {{
             const res = await fetch('https://app.vpgsolucoes.com.br/api/bot/check-cliente', {{
                 method: 'POST',
@@ -321,18 +347,15 @@ client.on('message', async (msg) => {{
                 await finalizarAgendamento(userFrom, sendFunc);
             }} else {{
                 userState[userFrom].flow = 'schedule_cadastro';
-                await sendFunc("Notei que ainda não tem cadastro com a gente, apenas informe seu *Nome e Sobrenome* para o cadastro:");
+                await sendFunc("Notei que ainda não tem cadastro com a gente. Por favor, digite seu *Nome e Sobrenome* para confirmar a reserva:");
             }}
-        }} catch (err) {{
-            await finalizarAgendamento(userFrom, sendFunc);
-        }}
+        }} catch (err) {{ await finalizarAgendamento(userFrom, sendFunc); }}
     }}
 
     async function finalizarAgendamento(userFrom, sendFunc) {{
         const s = userState[userFrom];
-        let resumo = `✅ *AGENDAMENTO CONFIRMADO!*\\n\\n👤 Cliente: *${{s.nome || 'Não informado'}}*\\n📅 Data: *${{s.selectedDay}}*\\n⏰ Horário: *${{s.selectedTime}}*`;
-        if (s.selectedService) resumo += `\\n✂️ Serviço: *${{s.selectedService}}*`;
-        resumo += `\\n\\nSeu horário já consta em nosso painel oficial. Te esperamos!\\n\\n_Digite *menu* para voltar ao início._`;
+        let resumo = `✅ *AGENDAMENTO CONFIRMADO!*\\n\\n👤 Cliente: *${{s.nome || 'Não informado'}}*\\n✂️ Serviço: *${{s.selectedService}}*\\n📅 Data: *${{s.selectedDay}}*\\n⏰ Horário: *${{s.selectedTime}}*`;
+        resumo += `\\n\\nJá anotei na agenda oficial. Te esperamos!\\n\\n_Digite *menu* para voltar ao início._`;
         
         await sendFunc(resumo);
         userState[userFrom].active = false;
@@ -343,12 +366,12 @@ client.on('message', async (msg) => {{
             body: JSON.stringify({{
                 whatsapp: userFrom,
                 nome: s.nome,
-                servico: s.selectedService,
+                servico_id: s.selectedServiceId,
                 data: s.selectedDay,
                 hora: s.selectedTime,
                 estabelecimento_id: '{sessao}'
             }})
-        }}).catch(err => console.log('Erro de comunicacao com o painel', err));
+        }}).catch(err => console.log('Erro ao salvar:', err));
     }}
 
     // ==========================================
@@ -375,17 +398,22 @@ client.on('message', async (msg) => {{
         }}
 
         if (item.is_catalogo) {{
-            let servText = mockServicos.map(s => `✔️ ${{s}}`).join('\\n');
-            await send(`📋 *Nosso Catálogo*\\n\\n${{servText}}\\n\\n_Digite *menu* para voltar._`);
+            let servText = servicosCadastrados.map(s => `✔️ ${{s.nome}} - R$ ${{s.valor.toFixed(2).replace('.', ',')}}`).join('\\n');
+            await send(`📋 *Nossos Serviços*\\n\\n${{servText}}\\n\\n_Digite *menu* para voltar._`);
             userState[from].active = false;
             return;
         }}
 
         if (item.is_agendamento) {{
-            userState[from].flow = 'schedule_day';
-            const days = getNextDaysList();
-            let daysText = days.map((d, i) => `*${{i+1}}.* ${{d}}`).join('\\n');
-            await send(`📅 *Agendamento*\\n\\nPara qual dia você deseja agendar? (Próximos ${{daysAhead}} dias)\\n\\n${{daysText}}\\n\\n_Digite o número correspondente ao dia:_`);
+            // O INÍCIO DO NOVO FLUXO (PERGUNTA O SERVIÇO)
+            if (servicosCadastrados.length === 0) await fetchServicos();
+            if (servicosCadastrados.length === 0) {{
+                await send('❌ Desculpe, não há serviços cadastrados no sistema para agendar no momento.');
+                userState[from].active = false; return;
+            }}
+            userState[from].flow = 'schedule_service';
+            let servText = servicosCadastrados.map((s, i) => `*${{i+1}}.* ${{s.nome}} - R$ ${{s.valor.toFixed(2).replace('.', ',')}}`).join('\\n');
+            await send(`📅 *Agendamento*\\n\\nQual serviço você deseja realizar?\\n\\n${{servText}}\\n\\n_Digite o número correspondente ao serviço:_`);
             return;
         }}
 
@@ -398,10 +426,7 @@ client.on('message', async (msg) => {{
           await send(`*${{item.text}}*\\n\\n${{buildMenuText(item.children)}}\\n\\n_Escolha uma opção:_`);
         }}
     }}
-
-  }} catch (error) {{
-    console.error("Erro:", error);
-  }}
+  }} catch (error) {{ console.error("Erro:", error); }}
 }});
 
 client.initialize();
