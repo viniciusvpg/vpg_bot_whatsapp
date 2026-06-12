@@ -208,7 +208,7 @@ function getNextDaysList() {{
     let days = [];
     let curr = new Date();
     const week = ['Dom','Seg','Ter','Qua','Qui','Sex','Sáb'];
-    
+
     let dHoje = String(curr.getDate()).padStart(2, '0');
     let mHoje = String(curr.getMonth() + 1).padStart(2, '0');
     days.push(`Hoje ${{dHoje}}/${{mHoje}}`);
@@ -343,22 +343,29 @@ client.on('message', async (msg) => {{
         await sendFunc("⏳ Só um momento, estou preparando sua reserva...");
         try {{
             const res = await axios.post('https://app.vpgsolucoes.com.br/api/bot/check-cliente', {{ 
-                whatsapp: userFrom, estabelecimento_id: '{sessao}' 
+                whatsapp: userFrom, estabelecimento_id: parseInt('{sessao}') 
             }});
 
             if (res.data.registrado) {{
                 userState[userFrom].nome = res.data.nome;
                 await finalizarAgendamento(userFrom, sendFunc);
             }} else {{
+                // Se não tem cadastro
                 userState[userFrom].flow = 'schedule_cadastro';
                 await sendFunc("Notei que ainda não tem cadastro com a gente. Por favor, digite seu *Nome e Sobrenome* para confirmar a reserva:");
             }}
-        }} catch (err) {{ await finalizarAgendamento(userFrom, sendFunc); }}
+        }} catch (err) {{ 
+            // SE A API FALHAR: Agora ele pede o nome por segurança ao invés de pular
+            userState[userFrom].flow = 'schedule_cadastro';
+            await sendFunc("Por favor, digite seu *Nome e Sobrenome* para confirmar a reserva na agenda:");
+        }}
     }}
 
     async function finalizarAgendamento(userFrom, sendFunc) {{
         const s = userState[userFrom];
-        let resumo = `✅ *AGENDAMENTO CONFIRMADO!*\\n\\n👤 Cliente: *${{s.nome || 'Não informado'}}*\\n✂️ Serviço: *${{s.selectedService}}*\\n📅 Data: *${{s.selectedDay}}*\\n⏰ Horário: *${{s.selectedTime}}*`;
+        let nomeFinal = s.nome || 'Não informado';
+        
+        let resumo = `✅ *AGENDAMENTO CONFIRMADO!*\\n\\n👤 Cliente: *${{nomeFinal}}*\\n✂️ Serviço: *${{s.selectedService}}*\\n📅 Data: *${{s.selectedDay}}*\\n⏰ Horário: *${{s.selectedTime}}*`;
         resumo += `\\n\\nJá anotei na agenda oficial. Te esperamos!\\n\\n_Digite *menu* para voltar ao início._`;
         
         await sendFunc(resumo);
@@ -366,12 +373,12 @@ client.on('message', async (msg) => {{
         
         axios.post('https://app.vpgsolucoes.com.br/api/bot/registrar-agendamento', {{
             whatsapp: userFrom,
-            nome: s.nome,
+            nome: nomeFinal,
             servico_id: s.selectedServiceId,
             data: s.selectedDay,
             hora: s.selectedTime,
-            estabelecimento_id: '{sessao}'
-        }}).catch(err => console.log('Erro ao salvar:', err.message));
+            estabelecimento_id: parseInt('{sessao}')
+        }}).catch(err => console.log('Erro ao salvar no painel:', err.message));
     }}
 
     // ==========================================
