@@ -163,7 +163,7 @@ const showProducts = {show_products};
 const enableScheduling = {enable_scheduling};
 const daysAhead = {days_ahead};
 
-// Mock de Integração com o seu Banco de Dados
+// Mock de Integração
 const mockHorarios = ['09:00', '10:00', '14:00', '15:30', '17:00'];
 const mockServicos = ['Corte Social', 'Barba Completa', 'Combo Corte + Barba', 'Platinado'];
 
@@ -226,7 +226,6 @@ client.on('message', async (msg) => {{
     try {{ chat = await msg.getChat(); }} catch (e) {{}}
     const send = async (text) => chat ? await chat.sendMessage(text) : await client.sendMessage(from, text);
 
-    // Reinicia o fluxo sempre que digitar menu
     if (textLower === 'menu' || textLower === 'oi' || body === '0') {{
       userState[from] = {{ active: true, path: [], flow: 'menu' }};
       await send(`{welcome}\\n\\n${{buildMenuText(getActiveMenu())}}\\n\\n_Digite o número da opção desejada._`);
@@ -288,17 +287,15 @@ client.on('message', async (msg) => {{
         }}
 
         if (userState[from].flow === 'schedule_cadastro') {{
-            userState[from].nome = body; // Salva o nome digitado pelo cliente
+            userState[from].nome = body;
             await finalizarAgendamento(from, send);
             return;
         }}
     }}
 
-    // VERIFICA SE A CLIENTE TEM CADASTRO NO FLASK
     async function checkCadastro(userFrom, sendFunc) {{
         await sendFunc("⏳ Só um momento, estou verificando a sua ficha na nossa recepção...");
         try {{
-            // ATENÇÃO: Confirme se este é o link correto do seu Flask
             const res = await fetch('https://app.vpgsolucoes.com.br/api/bot/check-cliente', {{
                 method: 'POST',
                 headers: {{'Content-Type': 'application/json'}},
@@ -314,12 +311,10 @@ client.on('message', async (msg) => {{
                 await sendFunc("Notei que ainda não tem cadastro com a gente, apenas informe seu *Nome e Sobrenome* para o cadastro:");
             }}
         }} catch (err) {{
-            // Se der erro de comunicação, prossegue sem o nome para não travar o cliente
             await finalizarAgendamento(userFrom, sendFunc);
         }}
     }}
 
-    // FINALIZA E ENVIA PARA O PAINEL OFICIAL
     async function finalizarAgendamento(userFrom, sendFunc) {{
         const s = userState[userFrom];
         let resumo = `✅ *AGENDAMENTO CONFIRMADO!*\\n\\n👤 Cliente: *${{s.nome || 'Não informado'}}*\\n📅 Data: *${{s.selectedDay}}*\\n⏰ Horário: *${{s.selectedTime}}*`;
@@ -329,7 +324,6 @@ client.on('message', async (msg) => {{
         await sendFunc(resumo);
         userState[userFrom].active = false;
         
-        // DISPARA OS DADOS PARA O SEU FLASK GRAVAR NO BANCO
         fetch('https://app.vpgsolucoes.com.br/api/bot/registrar-agendamento', {{
             method: 'POST',
             headers: {{'Content-Type': 'application/json'}},
@@ -341,68 +335,55 @@ client.on('message', async (msg) => {{
                 hora: s.selectedTime,
                 estabelecimento_id: '{sessao}'
             }})
-        }}).catch(err => console.log('Erro ao salvar no painel:', err));
-    }}
-
-    async function finalizarAgendamento(userFrom, sendFunc) {{
-        const s = userState[userFrom];
-        let resumo = `✅ *AGENDAMENTO CONFIRMADO!*\\n\\n📅 Data: *${{s.selectedDay}}*\\n⏰ Horário: *${{s.selectedTime}}*`;
-        if (s.selectedService) resumo += `\\n✂️ Serviço: *${{s.selectedService}}*`;
-        resumo += `\\n\\nSeu horário já consta em nosso painel oficial. Te esperamos!\\n\\n_Digite *menu* para voltar ao início._`;
-        
-        await sendFunc(resumo);
-        userState[userFrom].active = false;
-        
-        // POST PARA O SEU FLASK CORRIGIDO AQUI
-        // axios.post('https://seu-painel.com/api/registrar-agendamento', {{ data: s.selectedDay, hora: s.selectedTime }});
+        }}).catch(err => console.log('Erro de comunicacao com o painel', err));
     }}
 
     // ==========================================
     // FLUXO DO MENU PRINCIPAL
     // ==========================================
-    const activeMenu = getActiveMenu();
-    const choice = parseInt(body) - 1;
-    
-    if (isNaN(choice) || choice < 0 || choice >= activeMenu.length && userState[from].path.length === 0) {{
-      await send('❌ Opção inválida. Digite o número correspondente.');
-      return;
-    }}
-
-    let currentPath = userState[from].path;
-    let targetLevel = [...currentPath, choice];
-    let tempMenu = activeMenu;
-    let item = null;
-
-    for (const idx of targetLevel) {{
-      if (!tempMenu[idx]) {{ await send('❌ Opção inválida.'); return; }}
-      item = tempMenu[idx];
-      tempMenu = item.children || [];
-    }}
-
-    if (item.is_catalogo) {{
-        let servText = mockServicos.map(s => `✔️ ${{s}}`).join('\\n');
-        await send(`📋 *Nosso Catálogo*\\n\\n${{servText}}\\n\\n_Digite *menu* para voltar._`);
-        userState[from].active = false;
-        return;
-    }}
-
-    // INICIA O FLUXO DE AGENDAMENTO
-    if (item.is_agendamento) {{
-        userState[from].flow = 'schedule_day';
-        const days = getNextDaysList();
-        let daysText = days.map((d, i) => `*${{i+1}}.* ${{d}}`).join('\\n');
+    if (!userState[from].flow.startsWith('schedule_')) {{
+        const activeMenu = getActiveMenu();
+        const choice = parseInt(body) - 1;
         
-        await send(`📅 *Agendamento*\\n\\nPara qual dia você deseja agendar? (Próximos ${{daysAhead}} dias)\\n\\n${{daysText}}\\n\\n_Digite o número correspondente ao dia:_`);
-        return;
-    }}
+        if (isNaN(choice) || choice < 0 || choice >= activeMenu.length && userState[from].path.length === 0) {{
+          await send('❌ Opção inválida. Digite o número correspondente.');
+          return;
+        }}
 
-    if (item.final_response || !item.children || item.children.length === 0) {{
-      await send(item.final_response || 'Obrigado pelo contato!');
-      await send('_Digite *menu* para voltar ao início._');
-      userState[from].active = false;
-    }} else {{
-      userState[from].path = targetLevel;
-      await send(`*${{item.text}}*\\n\\n${{buildMenuText(item.children)}}\\n\\n_Escolha uma opção:_`);
+        let currentPath = userState[from].path;
+        let targetLevel = [...currentPath, choice];
+        let tempMenu = activeMenu;
+        let item = null;
+
+        for (const idx of targetLevel) {{
+          if (!tempMenu[idx]) {{ await send('❌ Opção inválida.'); return; }}
+          item = tempMenu[idx];
+          tempMenu = item.children || [];
+        }}
+
+        if (item.is_catalogo) {{
+            let servText = mockServicos.map(s => `✔️ ${{s}}`).join('\\n');
+            await send(`📋 *Nosso Catálogo*\\n\\n${{servText}}\\n\\n_Digite *menu* para voltar._`);
+            userState[from].active = false;
+            return;
+        }}
+
+        if (item.is_agendamento) {{
+            userState[from].flow = 'schedule_day';
+            const days = getNextDaysList();
+            let daysText = days.map((d, i) => `*${{i+1}}.* ${{d}}`).join('\\n');
+            await send(`📅 *Agendamento*\\n\\nPara qual dia você deseja agendar? (Próximos ${{daysAhead}} dias)\\n\\n${{daysText}}\\n\\n_Digite o número correspondente ao dia:_`);
+            return;
+        }}
+
+        if (item.final_response || !item.children || item.children.length === 0) {{
+          await send(item.final_response || 'Obrigado pelo contato!');
+          await send('_Digite *menu* para voltar ao início._');
+          userState[from].active = false;
+        }} else {{
+          userState[from].path = targetLevel;
+          await send(`*${{item.text}}*\\n\\n${{buildMenuText(item.children)}}\\n\\n_Escolha uma opção:_`);
+        }}
     }}
 
   }} catch (error) {{
