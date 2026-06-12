@@ -208,6 +208,11 @@ function getNextDaysList() {{
     let days = [];
     let curr = new Date();
     const week = ['Dom','Seg','Ter','Qua','Qui','Sex','Sáb'];
+    
+    let dHoje = String(curr.getDate()).padStart(2, '0');
+    let mHoje = String(curr.getMonth() + 1).padStart(2, '0');
+    days.push(`Hoje ${{dHoje}}/${{mHoje}}`);
+
     for(let i=1; i<=daysAhead; i++) {{
         curr.setDate(curr.getDate() + 1);
         let d = String(curr.getDate()).padStart(2, '0');
