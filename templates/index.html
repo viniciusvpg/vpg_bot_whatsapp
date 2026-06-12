@@ -215,8 +215,7 @@
         Adiciona a opção "Catálogo" no menu e também <strong>pergunta qual serviço o cliente deseja na hora de agendar</strong>.
       </p>
       <div class="products-list">
-        <div class="product-badge"><i class="fa-solid fa-scissors"></i> Corte Social - R$ 40,00</div>
-        <div class="product-badge"><i class="fa-solid fa-spray-can"></i> Barba Completa - R$ 35,00</div>
+        <!-- Serviços serão renderizados aqui dinamicamente -->
       </div>
     </div>
   </div>
@@ -302,6 +301,7 @@ const sessao = urlParams.get('sessao') || 'default';
 
 let config = { business_name: '', welcome_message: '', menu: [], show_products: false, enable_scheduling: false, scheduling_days_ahead: 7 };
 let ws = null;
+let servicosCadastrados = []; // Array global para armazenar os serviços
 
 function switchTab(name) {
   document.querySelectorAll('.tab-content').forEach(t => t.classList.remove('active'));
@@ -384,18 +384,16 @@ function updateBotStatus(status) {
     document.getElementById('qrConnected').style.display = 'none';
     
     start.style.display = 'inline-flex'; 
-    start.disabled = false; // Destrava o botão caso tenha travado
+    start.disabled = false;
     restart.style.display = 'none'; 
     stop.style.display = 'none';
   }
 }
 
 async function startBot() {
-  // 1. Esconde as coisas e mostra o loading
   document.getElementById('qrPlaceholder').style.display = 'none';
   document.getElementById('qrLoading').style.display = 'flex';
   
-  // 2. Trava o botão para não clicar duas vezes
   document.getElementById('btnStart').disabled = true;
   document.getElementById('btnStart').innerHTML = '<i class="fa-solid fa-spinner fa-spin"></i> Iniciando...';
 
@@ -410,7 +408,6 @@ async function startBot() {
       document.getElementById('qrLoading').style.display = 'none';
       document.getElementById('qrPlaceholder').style.display = 'flex';
     } else {
-      // Se deu certo, atualiza o status visual
       updateBotStatus('starting');
       document.getElementById('btnStart').innerHTML = '<i class="fa-solid fa-play"></i> Iniciar Bot';
     }
@@ -429,7 +426,22 @@ async function restartBot() {
   setTimeout(() => startBot(), 1500);
 }
 
-// ── Configurações ─────────────────────────────────────────────────────────
+// ── Configurações e Busca de Serviços Reais ───────────────────────────────
+async function fetchServicos() {
+    try {
+        const res = await fetch(`https://app.vpgsolucoes.com.br/api/bot/servicos?estabelecimento_id=${sessao}`);
+        const data = await res.json();
+        if (data && data.servicos) {
+            servicosCadastrados = data.servicos.map(s => `${s.nome} - R$ ${s.valor.toFixed(2).replace('.', ',')}`);
+        } else {
+            servicosCadastrados = [];
+        }
+    } catch(err) {
+        console.error("Erro ao buscar serviços:", err);
+        servicosCadastrados = [];
+    }
+}
+
 async function loadConfig() {
   const r = await fetch(`/bot-interno/api/config?sessao=${sessao}`);
   config = await r.json();
@@ -437,6 +449,9 @@ async function loadConfig() {
   document.getElementById('businessName').value = config.business_name || '';
   document.getElementById('welcomeMessage').value = config.welcome_message || '';
   updateBusinessName();
+  
+  // Aguarda carregar os serviços da API oficial para usar na interface e simulador
+  await fetchServicos();
   
   document.getElementById('toggleProducts').checked = config.show_products === true;
   toggleProductsUI(config.show_products === true);
@@ -465,7 +480,27 @@ function updateBusinessName() {
   document.getElementById('sobreEmpresaLabel').textContent = val;
 }
 
-function toggleProductsUI(isChecked) { document.getElementById('productsPanel').style.display = isChecked ? 'block' : 'none'; }
+async function toggleProductsUI(isChecked) { 
+    const panel = document.getElementById('productsPanel');
+    panel.style.display = isChecked ? 'block' : 'none'; 
+    
+    if (isChecked) {
+        const listDiv = panel.querySelector('.products-list');
+        listDiv.innerHTML = '<span style="font-size:13px; color: var(--text-muted);">Sincronizando serviços... <i class="fa-solid fa-spinner fa-spin"></i></span>';
+        
+        await fetchServicos(); // Atualiza a lista caso o cliente tenha acabado de cadastrar
+        
+        if (servicosCadastrados.length > 0) {
+            listDiv.innerHTML = '';
+            servicosCadastrados.forEach(servico => {
+                listDiv.innerHTML += `<div class="product-badge"><i class="fa-solid fa-check"></i> ${servico}</div>`;
+            });
+        } else {
+            listDiv.innerHTML = '<span style="font-size:13px; color: var(--warning);"><i class="fa-solid fa-triangle-exclamation"></i> Nenhum serviço cadastrado no painel principal.</span>';
+        }
+    }
+}
+
 function toggleScheduleUI(isChecked) { document.getElementById('schedulingPanel').style.display = isChecked ? 'block' : 'none'; }
 
 // ── Menu Manual Builder ───────────────────────────────────────────────────
@@ -502,10 +537,9 @@ function createRootItem(item, index) {
 
 function addRootItem() { config.menu.push({ id: generateId(), text: 'Nova Opção', final_response: '' }); renderMenuTree(); }
 
-// ── Simulador com Máquina de Estados (Agendamento) ────────────────────────
+// ── Simulador Dinâmico ────────────────────────────────────────────────────
 let simState = { active: false, flow: 'menu', data: {} };
-const mockHorarios = ['09:00', '10:00', '14:00', '15:30', '17:00'];
-const mockServicos = ['Corte Social', 'Barba Completa', 'Combo Corte + Barba', 'Platinado'];
+const mockHorarios = ['09:00', '10:00', '14:00', '15:30', '17:00']; // Os horários continuam simulados no frontend
 
 function getNextDaysListSim() {
     let days = []; let curr = new Date(); const week = ['Dom','Seg','Ter','Qua','Qui','Sex','Sáb'];
@@ -559,7 +593,7 @@ function processSimMessage(body) {
     return;
   }
 
-  // Máquina de Estados: Agendamento
+  // Máquina de Estados: Agendamento usando Serviços Reais
   if (simState.flow.startsWith('schedule_')) {
       const choice = parseInt(body) - 1;
       
@@ -583,7 +617,7 @@ function processSimMessage(body) {
           
           if (config.show_products) {
               simState.flow = 'schedule_service';
-              let servText = mockServicos.map((s, i) => `*${i+1}.* ${s}`).join('\n');
+              let servText = servicosCadastrados.map((s, i) => `*${i+1}.* ${s}`).join('\n');
               addSimMessage(`Horário reservado para *${mockHorarios[choice]}*.\n\nQual serviço você deseja realizar?\n${servText}\n\n_Digite o número do serviço:_`, 'bot');
               return;
           } else {
@@ -592,10 +626,10 @@ function processSimMessage(body) {
       }
 
       if (simState.flow === 'schedule_service') {
-          if (isNaN(choice) || choice < 0 || choice >= mockServicos.length) {
+          if (isNaN(choice) || choice < 0 || choice >= servicosCadastrados.length) {
               addSimMessage('❌ Serviço inválido. Escolha um número.', 'bot'); return;
           }
-          simState.data.service = mockServicos[choice];
+          simState.data.service = servicosCadastrados[choice].split(' - R$')[0];
           finalizarSimulacao(); return;
       }
   }
@@ -619,7 +653,7 @@ function processSimMessage(body) {
       let item = activeMenu[choice];
 
       if (item.is_catalogo) {
-          let servText = mockServicos.map(s => `✔️ ${s}`).join('\n');
+          let servText = servicosCadastrados.map(s => `✔️ ${s}`).join('\n');
           addSimMessage(`📋 *Nosso Catálogo*\n\n${servText}\n\n_Digite *menu* para voltar._`, 'bot');
           simState.active = false; return;
       }

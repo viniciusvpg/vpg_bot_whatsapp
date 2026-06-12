@@ -163,9 +163,22 @@ const showProducts = {show_products};
 const enableScheduling = {enable_scheduling};
 const daysAhead = {days_ahead};
 
-// Mock de Integração
-const mockHorarios = ['09:00', '10:00', '14:00', '15:30', '17:00'];
-const mockServicos = ['Corte Social', 'Barba Completa', 'Combo Corte + Barba', 'Platinado'];
+let servicosCadastrados = [];
+const mockHorarios = ['09:00', '10:00', '14:00', '15:30', '17:00']; // (Os horarios ainda simulamos, precisariamos de uma logica maior para dias/horarios reais)
+
+// FUNÇÃO PARA BUSCAR OS SERVIÇOS NO SEU PAINEL FLASK ANTES DO BOT RESPONDER
+async function fetchServicos() {{
+    try {{
+        const res = await fetch(`https://app.vpgsolucoes.com.br/api/bot/servicos?estabelecimento_id={{sessao}}`);
+        const data = await res.json();
+        if(data && data.servicos) {{
+            servicosCadastrados = data.servicos.map(s => `${{s.nome}} - R$ ${{s.valor.toFixed(2)}}`);
+        }}
+    }} catch(err) {{
+        console.error("Erro ao buscar serviços:", err);
+        servicosCadastrados = ['Serviço Padrão (Falha ao carregar)'];
+    }}
+}}
 
 const client = new Client({{
   authStrategy: new LocalAuth({{ clientId: "client-{sessao}", dataPath: "./.wwebjs_auth_{sessao}" }}),
