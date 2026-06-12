@@ -432,13 +432,37 @@ async function fetchServicos() {
         const res = await fetch(`https://app.vpgsolucoes.com.br/api/bot/servicos?estabelecimento_id=${sessao}`);
         const data = await res.json();
         if (data && data.servicos) {
-            servicosCadastrados = data.servicos.map(s => `${s.nome} - R$ ${s.valor.toFixed(2).replace('.', ',')}`);
+            // Guarda o objeto inteiro em vez de apenas a string
+            servicosCadastrados = data.servicos;
         } else {
             servicosCadastrados = [];
         }
     } catch(err) {
         console.error("Erro ao buscar serviços:", err);
         servicosCadastrados = [];
+    }
+}
+
+async function toggleProductsUI(isChecked) { 
+    const panel = document.getElementById('productsPanel');
+    panel.style.display = isChecked ? 'block' : 'none'; 
+    
+    if (isChecked) {
+        const listDiv = panel.querySelector('.products-list');
+        listDiv.innerHTML = '<span style="font-size:13px; color: var(--text-muted);">Sincronizando serviços... <i class="fa-solid fa-spinner fa-spin"></i></span>';
+        
+        await fetchServicos(); 
+        
+        if (servicosCadastrados.length > 0) {
+            listDiv.innerHTML = '';
+            servicosCadastrados.forEach(servico => {
+                // Monta o visual certinho aqui
+                const valorFormatado = servico.valor.toFixed(2).replace('.', ',');
+                listDiv.innerHTML += `<div class="product-badge"><i class="fa-solid fa-check"></i> ${servico.nome} - R$ ${valorFormatado}</div>`;
+            });
+        } else {
+            listDiv.innerHTML = '<span style="font-size:13px; color: var(--warning);"><i class="fa-solid fa-triangle-exclamation"></i> Nenhum serviço cadastrado no painel principal.</span>';
+        }
     }
 }
 
@@ -478,27 +502,6 @@ async function saveConfig() {
 function updateBusinessName() {
   const val = document.getElementById('businessName').value || 'Meu Negócio';
   document.getElementById('sobreEmpresaLabel').textContent = val;
-}
-
-async function toggleProductsUI(isChecked) { 
-    const panel = document.getElementById('productsPanel');
-    panel.style.display = isChecked ? 'block' : 'none'; 
-    
-    if (isChecked) {
-        const listDiv = panel.querySelector('.products-list');
-        listDiv.innerHTML = '<span style="font-size:13px; color: var(--text-muted);">Sincronizando serviços... <i class="fa-solid fa-spinner fa-spin"></i></span>';
-        
-        await fetchServicos(); // Atualiza a lista caso o cliente tenha acabado de cadastrar
-        
-        if (servicosCadastrados.length > 0) {
-            listDiv.innerHTML = '';
-            servicosCadastrados.forEach(servico => {
-                listDiv.innerHTML += `<div class="product-badge"><i class="fa-solid fa-check"></i> ${servico}</div>`;
-            });
-        } else {
-            listDiv.innerHTML = '<span style="font-size:13px; color: var(--warning);"><i class="fa-solid fa-triangle-exclamation"></i> Nenhum serviço cadastrado no painel principal.</span>';
-        }
-    }
 }
 
 function toggleScheduleUI(isChecked) { document.getElementById('schedulingPanel').style.display = isChecked ? 'block' : 'none'; }

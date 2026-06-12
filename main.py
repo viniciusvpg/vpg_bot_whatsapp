@@ -154,6 +154,7 @@ def generate_bot_js(sessao: str):
     bot_code = f"""const {{ Client, LocalAuth }} = require('whatsapp-web.js');
 const qrcode = require('qrcode');
 const WebSocket = require('ws');
+const axios = require('axios'); 
 
 const ws = new WebSocket('ws://127.0.0.1:8000/ws/{sessao}');
 const menuBase = {menu_json};
@@ -167,12 +168,13 @@ let servicosCadastrados = [];
 
 async function fetchServicos() {{
     try {{
-        const res = await fetch(`https://app.vpgsolucoes.com.br/api/bot/servicos?estabelecimento_id={sessao}`);
-        const data = await res.json();
-        if(data && data.servicos) {{
-            servicosCadastrados = data.servicos;
+        const res = await axios.get(`https://app.vpgsolucoes.com.br/api/bot/servicos?estabelecimento_id={sessao}`);
+        if(res.data && res.data.servicos) {{
+            servicosCadastrados = res.data.servicos;
         }}
-    }} catch(err) {{ console.error("Erro:", err); }}
+    }} catch(err) {{ 
+        console.error("Erro ao buscar servicos com Axios:", err.message); 
+    }}
 }}
 
 const client = new Client({{
@@ -335,15 +337,12 @@ client.on('message', async (msg) => {{
     async function checkCadastro(userFrom, sendFunc) {{
         await sendFunc("⏳ Só um momento, estou preparando sua reserva...");
         try {{
-            const res = await fetch('https://app.vpgsolucoes.com.br/api/bot/check-cliente', {{
-                method: 'POST',
-                headers: {{'Content-Type': 'application/json'}},
-                body: JSON.stringify({{ whatsapp: userFrom, estabelecimento_id: '{sessao}' }})
+            const res = await axios.post('https://app.vpgsolucoes.com.br/api/bot/check-cliente', {{ 
+                whatsapp: userFrom, estabelecimento_id: '{sessao}' 
             }});
-            const data = await res.json();
 
-            if (data.registrado) {{
-                userState[userFrom].nome = data.nome;
+            if (res.data.registrado) {{
+                userState[userFrom].nome = res.data.nome;
                 await finalizarAgendamento(userFrom, sendFunc);
             }} else {{
                 userState[userFrom].flow = 'schedule_cadastro';
@@ -360,18 +359,14 @@ client.on('message', async (msg) => {{
         await sendFunc(resumo);
         userState[userFrom].active = false;
         
-        fetch('https://app.vpgsolucoes.com.br/api/bot/registrar-agendamento', {{
-            method: 'POST',
-            headers: {{'Content-Type': 'application/json'}},
-            body: JSON.stringify({{
-                whatsapp: userFrom,
-                nome: s.nome,
-                servico_id: s.selectedServiceId,
-                data: s.selectedDay,
-                hora: s.selectedTime,
-                estabelecimento_id: '{sessao}'
-            }})
-        }}).catch(err => console.log('Erro ao salvar:', err));
+        axios.post('https://app.vpgsolucoes.com.br/api/bot/registrar-agendamento', {{
+            whatsapp: userFrom,
+            nome: s.nome,
+            servico_id: s.selectedServiceId,
+            data: s.selectedDay,
+            hora: s.selectedTime,
+            estabelecimento_id: '{sessao}'
+        }}).catch(err => console.log('Erro ao salvar:', err.message));
     }}
 
     // ==========================================
