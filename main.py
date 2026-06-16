@@ -234,52 +234,13 @@ function getActiveMenu() {{
 
 client.on('message_create', async (msg) => {{
   try {{
-    // Se a mensagem for do dono, o chatId é o 'to'. Se for do cliente, é o 'from'
-    const chatId = msg.fromMe ? msg.to : msg.from;
-    
-    // Ignora status do WhatsApp
-    if (chatId === 'status@broadcast' || chatId.includes('@newsletter')) return;
-
-    if (!userState[chatId]) userState[chatId] = {{ active: false, flow: 'menu' }};
-
-    // ==============================================================
-    // INTERVENÇÃO HUMANA (12 HORAS DE PAUSA)
-    // ==============================================================
-    if (msg.fromMe) {{
-        // Exceção: Se você estiver mandando mensagem pro seu próprio número (testes), não trava
-        if (msg.to === msg.from) return; 
-        
-        // Se a mensagem acabou de ser enviada pelo NOSSO SCRIPT, nós ignoramos e deixamos o bot seguir a vida
-        if (botMessages[chatId] && (Date.now() - botMessages[chatId] < 5000)) {{
-            return;
-        }}
-
-        // Trava o robô por 12h para este cliente.
-        userState[chatId].lastOwnerMessage = Date.now();
-        userState[chatId].active = false;
-        return; 
-    }}
-
-    // Daqui pra baixo, sabemos que a mensagem veio do CLIENTE
-    const from = msg.from;
     const body = msg.body ? msg.body.trim() : "";
     const textLower = body.toLowerCase();
+    const from = msg.from;
 
     // ==============================================================
-    // EXTRAIR O NÚMERO DE TELEFONE REAL DO CLIENTE (TRATA @LID E CÓDIGO 55)
+    // 🛠️ COMANDO SECRETO DE DEBUG (NO TOPO PARA IGNORAR AS TRAVAS)
     // ==============================================================
-    if (!userState[from].realPhone) {{
-        // Pega sempre a raiz da conexão (from) e NUNCA o contato salvo no chip/celular
-        let rawNum = from.split('@')[0];
-        
-        // Tratamento: Se for número BR, remove o "55" inicial para casar com "4799..." no Painel
-        if (rawNum.startsWith('55') && (rawNum.length === 13 || rawNum.length === 12)) {{
-            rawNum = rawNum.substring(2);
-        }}
-        
-        userState[from].realPhone = rawNum;
-    }}
-
     if (textLower === 'debug') {{
         let cNumber = 'Não conseguiu puxar';
         try {{
@@ -287,15 +248,32 @@ client.on('message_create', async (msg) => {{
             cNumber = contact.number || 'Vazio';
         }} catch(e) {{}}
         
-        const debugMsg = `🛠️ *DEBUG DE CONEXÃO* 🛠️\n\n` +
-                         `*1. Origem Bruta (msg.from):*\n${{from}}\n\n` +
-                         `*2. Contato do Chip (contact.number):*\n${{cNumber}}\n\n` +
-                         `*3. Número Processado pro Painel:*\n${{userState[from].realPhone}}`;
+        // Simulação de como o painel vai salvar
+        let rawNum = from.split('@')[0];
+        if (rawNum.startsWith('55') && (rawNum.length === 13 || rawNum.length === 12)) {{
+            rawNum = rawNum.substring(2);
+        }}
+
+        const debugMsg = `🛠️ *DEBUG DE CONEXÃO* 🛠️\\n\\n` +
+                         `*1. Origem Bruta (msg.from):*\\n${{from}}\\n\\n` +
+                         `*2. Contato do Chip (contact.number):*\\n${{cNumber}}\\n\\n` +
+                         `*3. Número Processado pro Painel:*\\n${{rawNum}}`;
                          
-        if (chat) await chat.sendMessage(debugMsg);
+        let chatDebug;
+        try {{ chatDebug = await msg.getChat(); }} catch (e) {{}}
+        
+        if (chatDebug) await chatDebug.sendMessage(debugMsg);
         else await client.sendMessage(from, debugMsg);
-        return;
+        return; // Para o código aqui e não cai nas travas!
     }}
+
+    // Se a mensagem for do dono, o chatId é o 'to'. Se for do cliente, é o 'from'
+    const chatId = msg.fromMe ? msg.to : msg.from;
+    
+    // Ignora status do WhatsApp
+    if (chatId === 'status@broadcast' || chatId.includes('@newsletter')) return;
+
+    if (!userState[chatId]) userState[chatId] = {{ active: false, flow: 'menu' }};
 
     // Verifica a trava Humana (12 Horas)
     const TWELVE_HOURS = 12 * 60 * 60 * 1000;
