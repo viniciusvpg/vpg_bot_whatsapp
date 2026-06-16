@@ -254,7 +254,6 @@ client.on('message_create', async (msg) => {{
             return;
         }}
 
-        // Se chegou aqui, quer dizer que VOCÊ digitou no WhatsApp Web/Celular! 
         // Trava o robô por 12h para este cliente.
         userState[chatId].lastOwnerMessage = Date.now();
         userState[chatId].active = false;
@@ -265,6 +264,24 @@ client.on('message_create', async (msg) => {{
     const from = msg.from;
     const body = msg.body ? msg.body.trim() : "";
     const textLower = body.toLowerCase();
+
+    // ==============================================================
+    // EXTRAIR O NÚMERO DE TELEFONE REAL DO CLIENTE (TRATA @LID E CÓDIGO 55)
+    // ==============================================================
+    if (!userState[from].realPhone) {{
+        try {{
+            const contact = await msg.getContact();
+            let rawNum = contact.number || from.split('@')[0];
+            
+            // Tratamento: Se for número BR, remove o "55" inicial para casar com "4799..." no Painel
+            if (rawNum.startsWith('55') && (rawNum.length === 13 || rawNum.length === 12)) {{
+                rawNum = rawNum.substring(2);
+            }}
+            userState[from].realPhone = rawNum;
+        }} catch(e) {{
+            userState[from].realPhone = from.split('@')[0];
+        }}
+    }}
 
     // Verifica a trava Humana (12 Horas)
     const TWELVE_HOURS = 12 * 60 * 60 * 1000;
@@ -286,14 +303,11 @@ client.on('message_create', async (msg) => {{
     const send = async (text) => {{
         try {{ if (chat) await chat.sendStateTyping(); }} catch(e) {{}}
         
-        // Simula o tempo de digitar (1 a 2.5 segundos de acordo com tamanho da resposta)
         const waitTime = Math.floor(Math.random() * 1500) + 1000; 
         await delay(waitTime);
         
         try {{
-            // RASTREADOR: Avisamos o sistema que esta mensagem é do robô, para não ativar a trava de 12h!
             botMessages[from] = Date.now();
-            
             if (chat) await chat.sendMessage(text);
             else await client.sendMessage(from, text);
         }} catch (err) {{
@@ -399,9 +413,11 @@ client.on('message_create', async (msg) => {{
 
     async function checkCadastro(userFrom, sendFunc) {{
         await sendFunc("⏳ Só um momento, estou preparando sua reserva...");
+        const clientPhone = userState[userFrom].realPhone;
+        
         try {{
             const res = await axios.post('https://app.vpgsolucoes.com.br/api/bot/check-cliente', {{ 
-                whatsapp: userFrom, estabelecimento_id: parseInt('{sessao}') 
+                whatsapp: clientPhone, estabelecimento_id: parseInt('{sessao}') 
             }});
 
             if (res.data.registrado) {{
@@ -419,6 +435,7 @@ client.on('message_create', async (msg) => {{
 
     async function finalizarAgendamento(userFrom, sendFunc) {{
         const s = userState[userFrom];
+        const clientPhone = s.realPhone;
         let nomeFinal = s.nome || 'Não informado';
         
         let resumo = `✅ *AGENDAMENTO CONFIRMADO!*\\n\\n👤 Cliente: *${{nomeFinal}}*\\n✂️ Serviço: *${{s.selectedService}}*\\n📅 Data: *${{s.selectedDay}}*\\n⏰ Horário: *${{s.selectedTime}}*`;
@@ -427,11 +444,11 @@ client.on('message_create', async (msg) => {{
         await sendFunc(resumo);
         userState[userFrom].active = false;
         
-        // APLICA O COOLDOWN DE 1 MINUTO (Bot não reage se o cliente mandar emoji/obrigado logo em seguida)
+        // APLICA O COOLDOWN DE 1 MINUTO NA MENSAGEM FINAL
         userState[userFrom].cooldownUntil = Date.now() + 60000;
         
         axios.post('https://app.vpgsolucoes.com.br/api/bot/registrar-agendamento', {{
-            whatsapp: userFrom, nome: nomeFinal, servico_id: s.selectedServiceId, data: s.selectedDay, hora: s.selectedTime, estabelecimento_id: parseInt('{sessao}')
+            whatsapp: clientPhone, nome: nomeFinal, servico_id: s.selectedServiceId, data: s.selectedDay, hora: s.selectedTime, estabelecimento_id: parseInt('{sessao}')
         }}).catch(err => console.log('Erro ao salvar no painel:', err.message));
     }}
 
