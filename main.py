@@ -269,18 +269,15 @@ client.on('message_create', async (msg) => {{
     // EXTRAIR O NÚMERO DE TELEFONE REAL DO CLIENTE (TRATA @LID E CÓDIGO 55)
     // ==============================================================
     if (!userState[from].realPhone) {{
-        try {{
-            const contact = await msg.getContact();
-            let rawNum = contact.number || from.split('@')[0];
-            
-            // Tratamento: Se for número BR, remove o "55" inicial para casar com "4799..." no Painel
-            if (rawNum.startsWith('55') && (rawNum.length === 13 || rawNum.length === 12)) {{
-                rawNum = rawNum.substring(2);
-            }}
-            userState[from].realPhone = rawNum;
-        }} catch(e) {{
-            userState[from].realPhone = from.split('@')[0];
+        // Pega sempre a raiz da conexão (from) e NUNCA o contato salvo no chip/celular
+        let rawNum = from.split('@')[0];
+        
+        // Tratamento: Se for número BR, remove o "55" inicial para casar com "4799..." no Painel
+        if (rawNum.startsWith('55') && (rawNum.length === 13 || rawNum.length === 12)) {{
+            rawNum = rawNum.substring(2);
         }}
+        
+        userState[from].realPhone = rawNum;
     }}
 
     // Verifica a trava Humana (12 Horas)
