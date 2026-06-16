@@ -229,43 +229,80 @@ function getActiveMenu() {{
     return activeMenu;
 }}
 
-client.on('message', async (msg) => {{
+client.on('message_create', async (msg) => {{
   try {{
+    // Se a mensagem for do dono, o chatId é o 'to'. Se for do cliente, é o 'from'
+    const chatId = msg.fromMe ? msg.to : msg.from;
+    
+    // Ignora status do WhatsApp
+    if (chatId === 'status@broadcast' || chatId.includes('@newsletter')) return;
+
+    if (!userState[chatId]) userState[chatId] = {{ active: false, flow: 'menu' }};
+
+    // ==============================================================
+    // INTERVENÇÃO HUMANA (12 HORAS DE PAUSA)
+    // ==============================================================
+    if (msg.fromMe) {{
+        // Se o dono do bot mandou a mensagem, trava o bot por 12h
+        userState[chatId].lastOwnerMessage = Date.now();
+        userState[chatId].active = false;
+        return; 
+    }}
+
+    // Daqui pra baixo, sabemos que a mensagem veio do CLIENTE
     const from = msg.from;
     const body = msg.body ? msg.body.trim() : "";
     const textLower = body.toLowerCase();
 
-    if (msg.fromMe || from === 'status@broadcast' || from.includes('@newsletter')) return;
+    // Verifica a trava Humana (12 Horas)
+    const TWELVE_HOURS = 12 * 60 * 60 * 1000;
+    if (userState[from].lastOwnerMessage && (Date.now() - userState[from].lastOwnerMessage < TWELVE_HOURS)) {{
+        // Se ainda tá no prazo de 12h e o cliente não digitou "menu", o bot fica mudo.
+        if (textLower !== 'menu') return;
+    }}
+
+    // Verifica a trava de Resposta Final (1 Minuto)
+    if (userState[from].cooldownUntil && (Date.now() < userState[from].cooldownUntil)) {{
+        // Se tá no prazo de 1 min e o cliente não digitou "menu", o bot fica mudo.
+        if (textLower !== 'menu') return;
+    }}
 
     let chat;
     try {{ chat = await msg.getChat(); }} catch (e) {{}}
     const send = async (text) => chat ? await chat.sendMessage(text) : await client.sendMessage(from, text);
 
+    // RESET FORÇADO (O cliente digitou Menu, ignoramos as travas)
     if (textLower === 'menu' || textLower === 'oi' || body === '0') {{
-      userState[from] = {{ active: true, path: [], flow: 'menu' }};
+      userState[from].active = true;
+      userState[from].lastOwnerMessage = 0; // Libera a trava do dono
+      userState[from].cooldownUntil = 0;    // Libera a trava de 1 minuto
+      userState[from].path = [];
+      userState[from].flow = 'menu';
+      
       if(showProducts) await fetchServicos(); 
       await send(`{welcome}\\n\\n${{buildMenuText(getActiveMenu())}}\\n\\n_Digite o número da opção desejada._`);
       return;
     }}
 
-    if (!userState[from] || !userState[from].active) {{
-      userState[from] = {{ active: true, path: [], flow: 'menu' }};
+    // Se o bot está desativado (por inatividade, mas não por travas), ele se apresenta.
+    if (!userState[from].active) {{
+      userState[from].active = true;
+      userState[from].path = [];
+      userState[from].flow = 'menu';
       if(showProducts) await fetchServicos();
       await send(`{welcome}\\n\\n${{buildMenuText(getActiveMenu())}}\\n\\n_Como posso ajudar? Digite uma opção:_`);
       return;
     }}
 
     // ==========================================
-    // MÁQUINA DE ESTADOS - O NOVO FLUXO!
+    // MÁQUINA DE ESTADOS - AGENDAMENTO NATIVO
     // ==========================================
     if (userState[from].flow.startsWith('schedule_')) {{
         const choice = parseInt(body) - 1;
         
-        // ESTADO 1: Escolhendo o Serviço
         if (userState[from].flow === 'schedule_service') {{
             if (isNaN(choice) || choice < 0 || choice >= servicosCadastrados.length) {{
-                await send('❌ Serviço inválido. Escolha um número da lista.');
-                return;
+                await send('❌ Serviço inválido. Escolha um número da lista.'); return;
             }}
             const servicoObj = servicosCadastrados[choice];
             userState[from].selectedService = servicoObj.nome;
@@ -278,25 +315,20 @@ client.on('message', async (msg) => {{
             return;
         }}
 
-        // ESTADO 2: Escolhendo o Dia
         if (userState[from].flow === 'schedule_day') {{
             const days = getNextDaysList();
             if (isNaN(choice) || choice < 0 || choice >= days.length) {{
-                await send('❌ Opção inválida. Escolha um número da lista de dias.');
-                return;
+                await send('❌ Opção inválida. Escolha um número da lista de dias.'); return;
             }}
             userState[from].selectedDay = days[choice];
             
-            // BUSCA HORÁRIOS LIVRES REAIS NO PAINEL
             await send("⏳ Cruzando sua escolha com nossa agenda oficial...");
             try {{
                 const res = await fetch('https://app.vpgsolucoes.com.br/api/bot/horarios-livres', {{
                     method: 'POST',
                     headers: {{'Content-Type': 'application/json'}},
                     body: JSON.stringify({{ 
-                        estabelecimento_id: '{sessao}',
-                        servico_id: userState[from].selectedServiceId,
-                        data: userState[from].selectedDay
+                        estabelecimento_id: '{sessao}', servico_id: userState[from].selectedServiceId, data: userState[from].selectedDay
                     }})
                 }});
                 const data = await res.json();
@@ -313,25 +345,21 @@ client.on('message', async (msg) => {{
                 let timeText = data.horarios.map((h, i) => `*${{i+1}}.* ${{h}}`).join('\\n');
                 await send(`Temos estes horários disponíveis para *${{userState[from].selectedDay}}*:\\n\\n${{timeText}}\\n\\n_Digite o número do horário desejado:_`);
             }} catch(err) {{
-                await send("❌ Erro ao consultar agenda. Tente mais tarde.");
-                userState[from].active = false;
+                await send("❌ Erro ao consultar agenda. Tente mais tarde."); userState[from].active = false;
             }}
             return;
         }}
 
-        // ESTADO 3: Escolhendo a Hora
         if (userState[from].flow === 'schedule_time') {{
             const horarios = userState[from].horariosDisponiveis;
             if (isNaN(choice) || choice < 0 || choice >= horarios.length) {{
-                await send('❌ Horário inválido. Escolha um número da lista.');
-                return;
+                await send('❌ Horário inválido. Escolha um número da lista.'); return;
             }}
             userState[from].selectedTime = horarios[choice];
             await checkCadastro(from, send);
             return;
         }}
 
-        // ESTADO 4: Cadastrando Nome (se for novo)
         if (userState[from].flow === 'schedule_cadastro') {{
             userState[from].nome = body;
             await finalizarAgendamento(from, send);
@@ -350,12 +378,10 @@ client.on('message', async (msg) => {{
                 userState[userFrom].nome = res.data.nome;
                 await finalizarAgendamento(userFrom, sendFunc);
             }} else {{
-                // Se não tem cadastro
                 userState[userFrom].flow = 'schedule_cadastro';
                 await sendFunc("Notei que ainda não tem cadastro com a gente. Por favor, digite seu *Nome e Sobrenome* para confirmar a reserva:");
             }}
         }} catch (err) {{ 
-            // SE A API FALHAR: Agora ele pede o nome por segurança ao invés de pular
             userState[userFrom].flow = 'schedule_cadastro';
             await sendFunc("Por favor, digite seu *Nome e Sobrenome* para confirmar a reserva na agenda:");
         }}
@@ -371,13 +397,11 @@ client.on('message', async (msg) => {{
         await sendFunc(resumo);
         userState[userFrom].active = false;
         
+        // APLICA O COOLDOWN DE 1 MINUTO!
+        userState[userFrom].cooldownUntil = Date.now() + 60000;
+        
         axios.post('https://app.vpgsolucoes.com.br/api/bot/registrar-agendamento', {{
-            whatsapp: userFrom,
-            nome: nomeFinal,
-            servico_id: s.selectedServiceId,
-            data: s.selectedDay,
-            hora: s.selectedTime,
-            estabelecimento_id: parseInt('{sessao}')
+            whatsapp: userFrom, nome: nomeFinal, servico_id: s.selectedServiceId, data: s.selectedDay, hora: s.selectedTime, estabelecimento_id: parseInt('{sessao}')
         }}).catch(err => console.log('Erro ao salvar no painel:', err.message));
     }}
 
@@ -389,8 +413,7 @@ client.on('message', async (msg) => {{
         const choice = parseInt(body) - 1;
         
         if (isNaN(choice) || choice < 0 || choice >= activeMenu.length && userState[from].path.length === 0) {{
-          await send('❌ Opção inválida. Digite o número correspondente.');
-          return;
+          await send('❌ Opção inválida. Digite o número correspondente.'); return;
         }}
 
         let currentPath = userState[from].path;
@@ -408,11 +431,11 @@ client.on('message', async (msg) => {{
             let servText = servicosCadastrados.map(s => `✔️ ${{s.nome}} - R$ ${{s.valor.toFixed(2).replace('.', ',')}}`).join('\\n');
             await send(`📋 *Nossos Serviços*\\n\\n${{servText}}\\n\\n_Digite *menu* para voltar._`);
             userState[from].active = false;
+            userState[from].cooldownUntil = Date.now() + 60000; // Trava de 1 min
             return;
         }}
 
         if (item.is_agendamento) {{
-            // O INÍCIO DO NOVO FLUXO (PERGUNTA O SERVIÇO)
             if (servicosCadastrados.length === 0) await fetchServicos();
             if (servicosCadastrados.length === 0) {{
                 await send('❌ Desculpe, não há serviços cadastrados no sistema para agendar no momento.');
@@ -428,6 +451,7 @@ client.on('message', async (msg) => {{
           await send(item.final_response || 'Obrigado pelo contato!');
           await send('_Digite *menu* para voltar ao início._');
           userState[from].active = false;
+          userState[from].cooldownUntil = Date.now() + 60000; // Trava de 1 min
         }} else {{
           userState[from].path = targetLevel;
           await send(`*${{item.text}}*\\n\\n${{buildMenuText(item.children)}}\\n\\n_Escolha uma opção:_`);
