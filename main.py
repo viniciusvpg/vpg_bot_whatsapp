@@ -164,8 +164,9 @@ const showProducts = {show_products};
 const enableScheduling = {enable_scheduling};
 const daysAhead = {days_ahead};
 
+// Controle de Delay e Rastreio de Mensagens do Robô
 const delay = ms => new Promise(res => setTimeout(res, ms));
-
+const botMessages = {{}}; 
 let servicosCadastrados = [];
 
 async function fetchServicos() {{
@@ -247,8 +248,14 @@ client.on('message_create', async (msg) => {{
     if (msg.fromMe) {{
         // Exceção: Se você estiver mandando mensagem pro seu próprio número (testes), não trava
         if (msg.to === msg.from) return; 
+        
+        // Se a mensagem acabou de ser enviada pelo NOSSO SCRIPT, nós ignoramos e deixamos o bot seguir a vida
+        if (botMessages[chatId] && (Date.now() - botMessages[chatId] < 5000)) {{
+            return;
+        }}
 
-        // Se o dono do bot mandou a mensagem pro cliente, trava o bot por 12h
+        // Se chegou aqui, quer dizer que VOCÊ digitou no WhatsApp Web/Celular! 
+        // Trava o robô por 12h para este cliente.
         userState[chatId].lastOwnerMessage = Date.now();
         userState[chatId].active = false;
         return; 
@@ -274,22 +281,23 @@ client.on('message_create', async (msg) => {{
     try {{ chat = await msg.getChat(); }} catch (e) {{}}
     
     // ==============================================================
-    // ENVIO COM TOQUE HUMANO (DELAY + DIGITANDO)
+    // FUNÇÃO CENTRAL DE ENVIO - COM DELAY E "DIGITANDO..."
     // ==============================================================
     const send = async (text) => {{
+        try {{ if (chat) await chat.sendStateTyping(); }} catch(e) {{}}
+        
+        // Simula o tempo de digitar (1 a 2.5 segundos de acordo com tamanho da resposta)
+        const waitTime = Math.floor(Math.random() * 1500) + 1000; 
+        await delay(waitTime);
+        
         try {{
-            if (chat && typeof chat.sendStateTyping === 'function') {{
-                await chat.sendStateTyping();
-            }}
-            const waitTime = Math.floor(Math.random() * (2000 - 1000 + 1) + 1000); // 1 a 2 segundos
-            await delay(waitTime);
-            if (chat) {{
-                await chat.sendMessage(text);
-            }} else {{
-                await client.sendMessage(from, text);
-            }}
+            // RASTREADOR: Avisamos o sistema que esta mensagem é do robô, para não ativar a trava de 12h!
+            botMessages[from] = Date.now();
+            
+            if (chat) await chat.sendMessage(text);
+            else await client.sendMessage(from, text);
         }} catch (err) {{
-            await client.sendMessage(from, text); // Fallback de segurança
+            console.error('Erro de rede ao enviar:', err);
         }}
     }};
 
@@ -419,7 +427,7 @@ client.on('message_create', async (msg) => {{
         await sendFunc(resumo);
         userState[userFrom].active = false;
         
-        // APLICA O COOLDOWN DE 1 MINUTO NA MENSAGEM FINAL
+        // APLICA O COOLDOWN DE 1 MINUTO (Bot não reage se o cliente mandar emoji/obrigado logo em seguida)
         userState[userFrom].cooldownUntil = Date.now() + 60000;
         
         axios.post('https://app.vpgsolucoes.com.br/api/bot/registrar-agendamento', {{
@@ -452,7 +460,7 @@ client.on('message_create', async (msg) => {{
         }}
 
         if (item.is_catalogo) {{
-            let servText = servicosCadastrados.map(s => `✔️ ${{s.nome}} - R$ ${{s.valor.toFixed(2).replace('.', ',')}}`).join('\\n');
+            let servText = servicosCadastrados.map(s => `✔️ ${{s.nome}} - R$ ${{(s.valor || 0).toFixed(2).replace('.', ',')}}`).join('\\n');
             await send(`📋 *Nossos Serviços*\\n\\n${{servText}}\\n\\n_Digite *menu* para voltar._`);
             userState[from].active = false;
             userState[from].cooldownUntil = Date.now() + 60000; // Trava de 1 min
@@ -466,7 +474,7 @@ client.on('message_create', async (msg) => {{
                 userState[from].active = false; return;
             }}
             userState[from].flow = 'schedule_service';
-            let servText = servicosCadastrados.map((s, i) => `*${{i+1}}.* ${{s.nome}} - R$ ${{s.valor.toFixed(2).replace('.', ',')}}`).join('\\n');
+            let servText = servicosCadastrados.map((s, i) => `*${{i+1}}.* ${{s.nome}} - R$ ${{(s.valor || 0).toFixed(2).replace('.', ',')}}`).join('\\n');
             await send(`📅 *Agendamento*\\n\\nQual serviço você deseja realizar?\\n\\n${{servText}}\\n\\n_Digite o número correspondente ao serviço:_`);
             return;
         }}
