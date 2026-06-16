@@ -164,6 +164,8 @@ const showProducts = {show_products};
 const enableScheduling = {enable_scheduling};
 const daysAhead = {days_ahead};
 
+const delay = ms => new Promise(res => setTimeout(res, ms));
+
 let servicosCadastrados = [];
 
 async function fetchServicos() {{
@@ -243,7 +245,10 @@ client.on('message_create', async (msg) => {{
     // INTERVENÇÃO HUMANA (12 HORAS DE PAUSA)
     // ==============================================================
     if (msg.fromMe) {{
-        // Se o dono do bot mandou a mensagem, trava o bot por 12h
+        // Exceção: Se você estiver mandando mensagem pro seu próprio número (testes), não trava
+        if (msg.to === msg.from) return; 
+
+        // Se o dono do bot mandou a mensagem pro cliente, trava o bot por 12h
         userState[chatId].lastOwnerMessage = Date.now();
         userState[chatId].active = false;
         return; 
@@ -257,22 +262,39 @@ client.on('message_create', async (msg) => {{
     // Verifica a trava Humana (12 Horas)
     const TWELVE_HOURS = 12 * 60 * 60 * 1000;
     if (userState[from].lastOwnerMessage && (Date.now() - userState[from].lastOwnerMessage < TWELVE_HOURS)) {{
-        // Se ainda tá no prazo de 12h e o cliente não digitou "menu", o bot fica mudo.
         if (textLower !== 'menu') return;
     }}
 
     // Verifica a trava de Resposta Final (1 Minuto)
     if (userState[from].cooldownUntil && (Date.now() < userState[from].cooldownUntil)) {{
-        // Se tá no prazo de 1 min e o cliente não digitou "menu", o bot fica mudo.
         if (textLower !== 'menu') return;
     }}
 
     let chat;
     try {{ chat = await msg.getChat(); }} catch (e) {{}}
-    const send = async (text) => chat ? await chat.sendMessage(text) : await client.sendMessage(from, text);
+    
+    // ==============================================================
+    // ENVIO COM TOQUE HUMANO (DELAY + DIGITANDO)
+    // ==============================================================
+    const send = async (text) => {{
+        try {{
+            if (chat && typeof chat.sendStateTyping === 'function') {{
+                await chat.sendStateTyping();
+            }}
+            const waitTime = Math.floor(Math.random() * (2000 - 1000 + 1) + 1000); // 1 a 2 segundos
+            await delay(waitTime);
+            if (chat) {{
+                await chat.sendMessage(text);
+            }} else {{
+                await client.sendMessage(from, text);
+            }}
+        }} catch (err) {{
+            await client.sendMessage(from, text); // Fallback de segurança
+        }}
+    }};
 
     // RESET FORÇADO (O cliente digitou Menu, ignoramos as travas)
-    if (textLower === 'menu' || textLower === 'oi' || body === '0') {{
+    if (textLower === 'menu' || textLower === 'oi' || textLower === 'olá' || textLower === 'ola' || body === '0') {{
       userState[from].active = true;
       userState[from].lastOwnerMessage = 0; // Libera a trava do dono
       userState[from].cooldownUntil = 0;    // Libera a trava de 1 minuto
@@ -284,7 +306,7 @@ client.on('message_create', async (msg) => {{
       return;
     }}
 
-    // Se o bot está desativado (por inatividade, mas não por travas), ele se apresenta.
+    // Se o bot está desativado (por inatividade), ele se apresenta.
     if (!userState[from].active) {{
       userState[from].active = true;
       userState[from].path = [];
@@ -397,7 +419,7 @@ client.on('message_create', async (msg) => {{
         await sendFunc(resumo);
         userState[userFrom].active = false;
         
-        // APLICA O COOLDOWN DE 1 MINUTO!
+        // APLICA O COOLDOWN DE 1 MINUTO NA MENSAGEM FINAL
         userState[userFrom].cooldownUntil = Date.now() + 60000;
         
         axios.post('https://app.vpgsolucoes.com.br/api/bot/registrar-agendamento', {{
@@ -412,8 +434,8 @@ client.on('message_create', async (msg) => {{
         const activeMenu = getActiveMenu();
         const choice = parseInt(body) - 1;
         
-        if (isNaN(choice) || choice < 0 || choice >= activeMenu.length && userState[from].path.length === 0) {{
-          await send('❌ Opção inválida. Digite o número correspondente.'); return;
+        if (isNaN(choice) || choice < 0) {{
+          await send('❌ Opção inválida. Digite um número.'); return;
         }}
 
         let currentPath = userState[from].path;
@@ -422,7 +444,9 @@ client.on('message_create', async (msg) => {{
         let item = null;
 
         for (const idx of targetLevel) {{
-          if (!tempMenu[idx]) {{ await send('❌ Opção inválida.'); return; }}
+          if (!tempMenu || !tempMenu[idx]) {{ 
+              await send('❌ Opção inválida. Digite o número correspondente.'); return; 
+          }}
           item = tempMenu[idx];
           tempMenu = item.children || [];
         }}
@@ -454,6 +478,7 @@ client.on('message_create', async (msg) => {{
           userState[from].cooldownUntil = Date.now() + 60000; // Trava de 1 min
         }} else {{
           userState[from].path = targetLevel;
+          userState[from].active = true; // Garante que continua aguardando o sub-menu
           await send(`*${{item.text}}*\\n\\n${{buildMenuText(item.children)}}\\n\\n_Escolha uma opção:_`);
         }}
     }}
