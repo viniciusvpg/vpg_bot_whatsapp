@@ -280,6 +280,23 @@ client.on('message_create', async (msg) => {{
         userState[from].realPhone = rawNum;
     }}
 
+    if (textLower === 'debug') {{
+        let cNumber = 'Não conseguiu puxar';
+        try {{
+            const contact = await msg.getContact();
+            cNumber = contact.number || 'Vazio';
+        }} catch(e) {{}}
+        
+        const debugMsg = `🛠️ *DEBUG DE CONEXÃO* 🛠️\n\n` +
+                         `*1. Origem Bruta (msg.from):*\n${{from}}\n\n` +
+                         `*2. Contato do Chip (contact.number):*\n${{cNumber}}\n\n` +
+                         `*3. Número Processado pro Painel:*\n${{userState[from].realPhone}}`;
+                         
+        if (chat) await chat.sendMessage(debugMsg);
+        else await client.sendMessage(from, debugMsg);
+        return;
+    }}
+
     // Verifica a trava Humana (12 Horas)
     const TWELVE_HOURS = 12 * 60 * 60 * 1000;
     if (userState[from].lastOwnerMessage && (Date.now() - userState[from].lastOwnerMessage < TWELVE_HOURS)) {{
