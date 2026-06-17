@@ -242,29 +242,27 @@ client.on('message_create', async (msg) => {{
     // 🛠️ COMANDO SECRETO DE DEBUG (NO TOPO PARA IGNORAR AS TRAVAS)
     // ==============================================================
     if (textLower === 'debug') {{
-        let cNumber = 'Não conseguiu puxar';
+        let advanced = "Falhou ao ler os dados";
         try {{
             const contact = await msg.getContact();
-            cNumber = contact.number || 'Vazio';
-        }} catch(e) {{}}
-        
-        // Simulação de como o painel vai salvar
-        let rawNum = from.split('@')[0];
-        if (rawNum.startsWith('55') && (rawNum.length === 13 || rawNum.length === 12)) {{
-            rawNum = rawNum.substring(2);
+            advanced = `🛠️ *RAIO-X DO WHATSAPP* 🛠️\n\n` +
+                       `*1. msg.from:* ${{msg.from}}\n` +
+                       `*2. msg.author:* ${{msg.author || 'Vazio'}}\n` +
+                       `*3. contact.id.user:* ${{contact.id ? contact.id.user : 'Vazio'}}\n` +
+                       `*4. _data.author:* ${{msg._data && msg._data.author ? msg._data.author : 'Vazio'}}\n` +
+                       `*5. _data.sender:* ${{msg._data && msg._data.sender ? msg._data.sender : 'Vazio'}}\n` +
+                       `*6. _data.id.remote:* ${{msg._data && msg._data.id && msg._data.id.remote ? msg._data.id.remote : 'Vazio'}}\n` +
+                       `*7. _data.id.participant:* ${{msg._data && msg._data.id && msg._data.id.participant ? msg._data.id.participant : 'Vazio'}}`;
+        }} catch(e) {{
+            advanced = "Erro ao fazer Raio-X";
         }}
-
-        const debugMsg = `🛠️ *DEBUG DE CONEXÃO* 🛠️\\n\\n` +
-                         `*1. Origem Bruta (msg.from):*\\n${{from}}\\n\\n` +
-                         `*2. Contato do Chip (contact.number):*\\n${{cNumber}}\\n\\n` +
-                         `*3. Número Processado pro Painel:*\\n${{rawNum}}`;
-                         
+        
         let chatDebug;
         try {{ chatDebug = await msg.getChat(); }} catch (e) {{}}
         
-        if (chatDebug) await chatDebug.sendMessage(debugMsg);
-        else await client.sendMessage(from, debugMsg);
-        return; // Para o código aqui e não cai nas travas!
+        if (chatDebug) await chatDebug.sendMessage(advanced);
+        else await client.sendMessage(from, advanced);
+        return; 
     }}
 
     // Se a mensagem for do dono, o chatId é o 'to'. Se for do cliente, é o 'from'
