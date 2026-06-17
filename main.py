@@ -234,27 +234,47 @@ function getActiveMenu() {{
 
 client.on('message_create', async (msg) => {{
   try {{
-    // Apenas uma declaração para cada variável!
     const from = msg.from;
     const body = msg.body ? msg.body.trim() : "";
     const textLower = body.toLowerCase();
+    
+    // Identificador para saber se a msg é nossa ou do cliente
+    const chatId = msg.fromMe ? msg.to : msg.from;
+
+    if (chatId === 'status@broadcast' || chatId.includes('@newsletter')) return;
+
+    if (!userState[chatId]) userState[chatId] = {{ active: false, flow: 'menu' }};
 
     // ==============================================================
-    // EXTRAIR O NÚMERO DE TELEFONE REAL (BUSCANDO DO CONTACT.ID.USER)
+    // 1. TRAVA DE AUTO-LOOP E INTERVENÇÃO HUMANA
     // ==============================================================
-    if (!userState[from] || !userState[from].realPhone) {{
-        if (!userState[from]) userState[from] = {{ active: false, flow: 'menu' }};
+    if (msg.fromMe) {{
+        if (msg.to === msg.from) return; 
         
-        let rawNum = from.split('@')[0]; // Fallback caso dê erro
+        // AQUI ESTÁ A CORREÇÃO: Ignora a mensagem se foi o robô que enviou!
+        if (botMessages[chatId] && (Date.now() - botMessages[chatId] < 5000)) {{
+            return;
+        }}
+
+        // Se chegou aqui, foi o DONO (Humano) que enviou. Pausa o robô por 12h.
+        userState[chatId].lastOwnerMessage = Date.now();
+        userState[chatId].active = false;
+        return; 
+    }}
+
+    // ==============================================================
+    // 2. EXTRAIR O NÚMERO DE TELEFONE REAL DO CLIENTE
+    // ==============================================================
+    if (!userState[from].realPhone) {{
+        let rawNum = from.split('@')[0]; 
         
         try {{
             const contact = await msg.getContact();
             if (contact && contact.id && contact.id.user) {{
-                rawNum = contact.id.user; // Aqui está o nosso tesouro!
+                rawNum = contact.id.user; 
             }}
         }} catch (e) {{}}
 
-        // Limpeza do código do Brasil (55)
         if (rawNum.startsWith('55') && (rawNum.length === 13 || rawNum.length === 12)) {{
             rawNum = rawNum.substring(2);
         }}
@@ -262,13 +282,14 @@ client.on('message_create', async (msg) => {{
         userState[from].realPhone = rawNum;
     }}
 
-    // Verifica a trava Humana (12 Horas)
+    // ==============================================================
+    // 3. VERIFICAR TRAVAS DE TEMPO
+    // ==============================================================
     const TWELVE_HOURS = 12 * 60 * 60 * 1000;
     if (userState[from].lastOwnerMessage && (Date.now() - userState[from].lastOwnerMessage < TWELVE_HOURS)) {{
         if (textLower !== 'menu') return;
     }}
 
-    // Verifica a trava de Resposta Final (1 Minuto)
     if (userState[from].cooldownUntil && (Date.now() < userState[from].cooldownUntil)) {{
         if (textLower !== 'menu') return;
     }}
@@ -277,7 +298,7 @@ client.on('message_create', async (msg) => {{
     try {{ chat = await msg.getChat(); }} catch (e) {{}}
     
     // ==============================================================
-    // FUNÇÃO CENTRAL DE ENVIO - COM DELAY E "DIGITANDO..."
+    // 4. FUNÇÃO CENTRAL DE ENVIO - COM DELAY E RASTREADOR
     // ==============================================================
     const send = async (text) => {{
         try {{ if (chat) await chat.sendStateTyping(); }} catch(e) {{}}
@@ -286,7 +307,9 @@ client.on('message_create', async (msg) => {{
         await delay(waitTime);
         
         try {{
+            // Salva o envio no rastreador para evitar o LOOP infinito
             botMessages[from] = Date.now();
+            
             if (chat) await chat.sendMessage(text);
             else await client.sendMessage(from, text);
         }} catch (err) {{
@@ -297,8 +320,8 @@ client.on('message_create', async (msg) => {{
     // RESET FORÇADO (O cliente digitou Menu, ignoramos as travas)
     if (textLower === 'menu' || textLower === 'oi' || textLower === 'olá' || textLower === 'ola' || body === '0') {{
       userState[from].active = true;
-      userState[from].lastOwnerMessage = 0; // Libera a trava do dono
-      userState[from].cooldownUntil = 0;    // Libera a trava de 1 minuto
+      userState[from].lastOwnerMessage = 0; 
+      userState[from].cooldownUntil = 0;    
       userState[from].path = [];
       userState[from].flow = 'menu';
       
@@ -307,7 +330,6 @@ client.on('message_create', async (msg) => {{
       return;
     }}
 
-    // Se o bot está desativado (por inatividade), ele se apresenta.
     if (!userState[from].active) {{
       userState[from].active = true;
       userState[from].path = [];
@@ -482,7 +504,7 @@ client.on('message_create', async (msg) => {{
           userState[from].cooldownUntil = Date.now() + 60000; // Trava de 1 min
         }} else {{
           userState[from].path = targetLevel;
-          userState[from].active = true; // Garante que continua aguardando o sub-menu
+          userState[from].active = true; 
           await send(`*${{item.text}}*\\n\\n${{buildMenuText(item.children)}}\\n\\n_Escolha uma opção:_`);
         }}
     }}
