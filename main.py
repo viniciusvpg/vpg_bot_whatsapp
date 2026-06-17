@@ -234,8 +234,7 @@ function getActiveMenu() {{
 
 client.on('message_create', async (msg) => {{
   try {{
-    const body = msg.body ? msg.body.trim() : "";
-    const textLower = body.toLowerCase();
+    // Apenas uma declaração para cada variável!
     const from = msg.from;
     const body = msg.body ? msg.body.trim() : "";
     const textLower = body.toLowerCase();
