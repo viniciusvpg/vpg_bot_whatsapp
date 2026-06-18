@@ -518,27 +518,26 @@ client.on('message_create', async (msg) => {{
         }}
 
         if (item.is_agendamento) {{
-            await send("⏳ Verificando seu cadastro...");
+            // A verificação agora é totalmente silenciosa, sem texto!
             try {{
                 const res = await axios.post('https://app.vpgsolucoes.com.br/api/bot/check-agendamentos', {{
-                    whatsapp: userState[from].realPhone, estabelecimento_id: parseInt('{sessao}')
+                    whatsapp: userState[from].realPhone, estabelecimento_id: parseInt('{{sessao}}')
                 }});
                 
-                // Se a API devolver agendamentos, criamos o Sub-Menu!
+                // Se a API encontrar agendamentos, mostra as opções
                 if (res.data && res.data.agendamentos && res.data.agendamentos.length > 0) {{
                     userState[from].existing_appointments = res.data.agendamentos;
                     userState[from].flow = 'schedule_existing_action';
                     
-                    let text = `Notei que já consta um agendamento em aberto no sistema.\\n\\nO que deseja fazer?\\n*1.* Consultar meu agendamento\\n*2.* Novo Agendamento\\n\\n_Digite *menu* para voltar._`;
+                    let text = `Notei que já consta um agendamento em aberto no sistema.\n\n*1* - Consultar meu agendamento\n*2* - Novo Agendamento\n\n_Digite *menu* para voltar._`;
                     await send(text);
                     return;
                 }}
             }} catch(e) {{
-                // Esse Log vai te mostrar no terminal se a rota deu erro 500 ou 404
                 console.log("Erro ao checar agendamentos:", e.message);
             }}
             
-            // Se não tem agendamento ou se a API deu erro, vai direto pra marcar novo
+            // Se não tiver agendamento ou a API falhar, vai direto perguntar o serviço
             await startSchedulingFlow(from);
             return;
         }}
