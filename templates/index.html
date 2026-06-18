@@ -183,7 +183,6 @@
         O bot perguntará o <strong>Serviço, Dia e Hora</strong> diretamente no chat filtrando os horários vazios na hora e enviará para a sua agenda do painel.
       </p>
       
-      <!-- O BOTÃO AQUI FOI CORRIGIDO (Removido os inline styles que estragavam o slider) -->
       <div class="d-flex align-items-center justify-content-between mb-3" style="background: var(--surface2); padding: 12px; border-radius: 8px; max-width: 400px;">
         <span style="font-size: 13px; font-weight: 600;">Mostrar preço do serviço ao cliente</span>
         <label class="switch">
@@ -588,10 +587,19 @@ async function processSimMessage(body) {
       
       if (simState.flow === 'schedule_existing_action') {
           if (body === '1') {
+              let text = `📋 *Seus agendamentos em aberto:*\n\n`;
+              if (simState.existing_appointments) {
+                  simState.existing_appointments.forEach(a => {
+                      text += `📅 *${a.data}* às *${a.hora}* - ${a.servico || 'Serviço'}\n`;
+                  });
+              }
+              text += `\n_Digite *menu* para voltar._`;
+              addSimMessage(text, 'bot');
+              simState.active = false;
+          } else if (body === '2') {
               simularFlowService();
           } else {
-              simState.active = false;
-              addSimMessage('Retornando ao menu principal.\n_Digite *menu* para ver as opções._', 'bot');
+              addSimMessage("❌ Opção inválida.\nDigite *1* para Consultar, *2* para Novo Agendamento.", 'bot');
           }
           return;
       }
@@ -688,7 +696,7 @@ async function processSimMessage(body) {
       }
       
       if (item.is_agendamento) {
-          // No simulador, se quiser simular que tem horário, comente a linha abaixo e chame sua API.
+          // Aqui no simulador ele vai direto pra agendar, pois não checamos a conta simulada.
           simularFlowService();
           return;
       }
