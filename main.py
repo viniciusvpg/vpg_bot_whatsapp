@@ -33,6 +33,7 @@ class BotConfig(BaseModel):
     show_products: bool = False
     enable_scheduling: bool = False
     scheduling_days_ahead: int = 7
+    show_price_on_schedule: bool = True
 
 # ── Helpers (ISOLADOS POR SESSÃO) ─────────────────────────────────────────────
 def get_data_file(sessao: str) -> str:
@@ -50,7 +51,8 @@ def load_config(sessao: str) -> dict:
         "menu": [],
         "show_products": False,
         "enable_scheduling": False,
-        "scheduling_days_ahead": 7
+        "scheduling_days_ahead": 7,
+        "show_price_on_schedule": True
     }
 
 def save_config(sessao: str, config: dict):
@@ -149,6 +151,7 @@ def generate_bot_js(sessao: str):
     welcome = config["welcome_message"].replace("`", "\\`").replace('"', '\\"')
     show_products = str(config.get("show_products", False)).lower()
     enable_scheduling = str(config.get("enable_scheduling", False)).lower()
+    show_price = str(config.get("show_price_on_schedule", True)).lower()
     days_ahead = config.get("scheduling_days_ahead", 7)
     
     bot_code = f"""const {{ Client, LocalAuth }} = require('whatsapp-web.js');
@@ -162,6 +165,7 @@ const userState = {{}};
 
 const showProducts = {show_products};
 const enableScheduling = {enable_scheduling};
+const showPriceOnSchedule = {show_price};
 const daysAhead = {days_ahead};
 
 // Controle de Delay e Rastreio de Mensagens do Robô
@@ -250,13 +254,8 @@ client.on('message_create', async (msg) => {{
     // ==============================================================
     if (msg.fromMe) {{
         if (msg.to === msg.from) return; 
-        
-        // AQUI ESTÁ A CORREÇÃO: Ignora a mensagem se foi o robô que enviou!
-        if (botMessages[chatId] && (Date.now() - botMessages[chatId] < 5000)) {{
-            return;
-        }}
+        if (botMessages[chatId] && (Date.now() - botMessages[chatId] < 5000)) return;
 
-        // Se chegou aqui, foi o DONO (Humano) que enviou. Pausa o robô por 12h.
         userState[chatId].lastOwnerMessage = Date.now();
         userState[chatId].active = false;
         return; 
@@ -307,9 +306,7 @@ client.on('message_create', async (msg) => {{
         await delay(waitTime);
         
         try {{
-            // Salva o envio no rastreador para evitar o LOOP infinito
             botMessages[from] = Date.now();
-            
             if (chat) await chat.sendMessage(text);
             else await client.sendMessage(from, text);
         }} catch (err) {{
@@ -317,7 +314,7 @@ client.on('message_create', async (msg) => {{
         }}
     }};
 
-    // RESET FORÇADO (O cliente digitou Menu, ignoramos as travas)
+    // RESET FORÇADO
     if (textLower === 'menu' || textLower === 'oi' || textLower === 'olá' || textLower === 'ola' || body === '0') {{
       userState[from].active = true;
       userState[from].lastOwnerMessage = 0; 
@@ -339,12 +336,41 @@ client.on('message_create', async (msg) => {{
       return;
     }}
 
+    // ==========================================================
+    // FUNÇÃO PARA INICIAR A LISTA DE SERVIÇOS (REUTILIZÁVEL)
+    // ==========================================================
+    async function startSchedulingFlow(userFrom) {{
+        userState[userFrom].flow = 'schedule_service';
+        if (servicosCadastrados.length === 0) await fetchServicos();
+        if (servicosCadastrados.length === 0) {{
+            await send('❌ Desculpe, não há serviços cadastrados no sistema para agendar no momento.');
+            userState[userFrom].active = false; return;
+        }}
+        let servText = servicosCadastrados.map((s, i) => {{
+            let priceStr = showPriceOnSchedule ? ` - R$ ${{(s.valor || 0).toFixed(2).replace('.', ',')}}` : '';
+            return `*${{i+1}}.* ${{s.nome}}${{priceStr}}`;
+        }}).join('\\n');
+        await send(`📅 *Agendamento*\\n\\nQual serviço você deseja realizar?\\n\\n${{servText}}\\n\\n_Digite o número correspondente ao serviço:_`);
+    }}
+
     // ==========================================
     // MÁQUINA DE ESTADOS - AGENDAMENTO NATIVO
     // ==========================================
     if (userState[from].flow.startsWith('schedule_')) {{
         const choice = parseInt(body) - 1;
         
+        // --- ETAPA: VERIFICAÇÃO DE AGENDAMENTO EXISTENTE ---
+        if (userState[from].flow === 'schedule_existing_action') {{
+            if (body === '1') {{
+                await startSchedulingFlow(from);
+            }} else {{
+                await send("Tudo bem! Retornando ao menu principal.\\n_Digite *menu* para ver as opções._");
+                userState[from].active = false;
+            }}
+            return;
+        }}
+
+        // --- ETAPA: ESCOLHER SERVIÇO E FILTRAR DIAS ---
         if (userState[from].flow === 'schedule_service') {{
             if (isNaN(choice) || choice < 0 || choice >= servicosCadastrados.length) {{
                 await send('❌ Serviço inválido. Escolha um número da lista.'); return;
@@ -353,48 +379,60 @@ client.on('message_create', async (msg) => {{
             userState[from].selectedService = servicoObj.nome;
             userState[from].selectedServiceId = servicoObj.id;
             
+            await send("⏳ Cruzando sua escolha com nossa agenda oficial para encontrar os melhores dias...");
+            
+            const daysToCheck = getNextDaysList();
+            const availableDays = [];
+            
+            // Busca simultânea de todos os dias
+            const checks = daysToCheck.map(async (dayStr) => {{
+                try {{
+                    const res = await axios.post('https://app.vpgsolucoes.com.br/api/bot/horarios-livres', {{
+                        estabelecimento_id: parseInt('{sessao}'), servico_id: userState[from].selectedServiceId, data: dayStr
+                    }});
+                    if (res.data && res.data.horarios && res.data.horarios.length > 0) {{
+                        return {{ day: dayStr, horarios: res.data.horarios }};
+                    }}
+                }} catch(e) {{}}
+                return null;
+            }});
+            
+            const results = await Promise.all(checks);
+            results.forEach(r => {{ if(r) availableDays.push(r); }});
+            
+            if (availableDays.length === 0) {{
+                await send(`Poxa, não temos nenhum dia com horários livres para esse serviço nos próximos ${{daysAhead}} dias.\\n\\nDigite *menu* e tente escolher outro serviço.`);
+                userState[from].active = false;
+                return;
+            }}
+            
+            userState[from].availableDaysData = availableDays;
             userState[from].flow = 'schedule_day';
-            const days = getNextDaysList();
-            let daysText = days.map((d, i) => `*${{i+1}}.* ${{d}}`).join('\\n');
-            await send(`Você escolheu *${{servicoObj.nome}}*.\\n\\nPara qual dia você deseja agendar?\\n\\n${{daysText}}\\n\\n_Digite o número correspondente ao dia:_`);
+            
+            let daysText = availableDays.map((d, i) => `*${{i+1}}.* ${{d.day}} (${{d.horarios.length}} vagas)`).join('\\n');
+            await send(`Você escolheu *${{servicoObj.nome}}*.\\n\\nTemos vagas abertas nestes dias:\\n\\n${{daysText}}\\n\\n_Digite o número correspondente ao dia:_`);
             return;
         }}
 
+        // --- ETAPA: ESCOLHER HORA ---
         if (userState[from].flow === 'schedule_day') {{
-            const days = getNextDaysList();
-            if (isNaN(choice) || choice < 0 || choice >= days.length) {{
+            const availableDays = userState[from].availableDaysData;
+            if (isNaN(choice) || choice < 0 || choice >= availableDays.length) {{
                 await send('❌ Opção inválida. Escolha um número da lista de dias.'); return;
             }}
-            userState[from].selectedDay = days[choice];
             
-            await send("⏳ Cruzando sua escolha com nossa agenda oficial...");
-            try {{
-                const res = await fetch('https://app.vpgsolucoes.com.br/api/bot/horarios-livres', {{
-                    method: 'POST',
-                    headers: {{'Content-Type': 'application/json'}},
-                    body: JSON.stringify({{ 
-                        estabelecimento_id: '{sessao}', servico_id: userState[from].selectedServiceId, data: userState[from].selectedDay
-                    }})
-                }});
-                const data = await res.json();
-                
-                if (!data.horarios || data.horarios.length === 0) {{
-                    await send(`Poxa, não temos horários com tempo suficiente para esse serviço no dia *${{userState[from].selectedDay}}*.\\n\\nDigite *menu* e tente escolher outro dia.`);
-                    userState[from].active = false;
-                    return;
-                }}
-                
-                userState[from].horariosDisponiveis = data.horarios;
-                userState[from].flow = 'schedule_time';
-                
-                let timeText = data.horarios.map((h, i) => `*${{i+1}}.* ${{h}}`).join('\\n');
-                await send(`Temos estes horários disponíveis para *${{userState[from].selectedDay}}*:\\n\\n${{timeText}}\\n\\n_Digite o número do horário desejado:_`);
-            }} catch(err) {{
-                await send("❌ Erro ao consultar agenda. Tente mais tarde."); userState[from].active = false;
-            }}
+            const selectedDayData = availableDays[choice];
+            userState[from].selectedDay = selectedDayData.day;
+            userState[from].horariosDisponiveis = selectedDayData.horarios;
+            
+            userState[from].flow = 'schedule_time';
+            
+            let timeText = selectedDayData.horarios.map((h, i) => `*${{i+1}}.* ${{h}}`).join('\\n');
+            await send(`Ótimo! Estes são os horários livres para *${{selectedDayData.day}}*:\\n\\n${{timeText}}\\n\\n_Digite o número do horário desejado:_`);
             return;
         }}
 
+        // --- ETAPA: FINALIZAÇÃO ---
         if (userState[from].flow === 'schedule_time') {{
             const horarios = userState[from].horariosDisponiveis;
             if (isNaN(choice) || choice < 0 || choice >= horarios.length) {{
@@ -444,8 +482,6 @@ client.on('message_create', async (msg) => {{
         
         await sendFunc(resumo);
         userState[userFrom].active = false;
-        
-        // APLICA O COOLDOWN DE 1 MINUTO NA MENSAGEM FINAL
         userState[userFrom].cooldownUntil = Date.now() + 60000;
         
         axios.post('https://app.vpgsolucoes.com.br/api/bot/registrar-agendamento', {{
@@ -481,19 +517,32 @@ client.on('message_create', async (msg) => {{
             let servText = servicosCadastrados.map(s => `✔️ ${{s.nome}} - R$ ${{(s.valor || 0).toFixed(2).replace('.', ',')}}`).join('\\n');
             await send(`📋 *Nossos Serviços*\\n\\n${{servText}}\\n\\n_Digite *menu* para voltar._`);
             userState[from].active = false;
-            userState[from].cooldownUntil = Date.now() + 60000; // Trava de 1 min
+            userState[from].cooldownUntil = Date.now() + 60000; 
             return;
         }}
 
         if (item.is_agendamento) {{
-            if (servicosCadastrados.length === 0) await fetchServicos();
-            if (servicosCadastrados.length === 0) {{
-                await send('❌ Desculpe, não há serviços cadastrados no sistema para agendar no momento.');
-                userState[from].active = false; return;
-            }}
-            userState[from].flow = 'schedule_service';
-            let servText = servicosCadastrados.map((s, i) => `*${{i+1}}.* ${{s.nome}} - R$ ${{(s.valor || 0).toFixed(2).replace('.', ',')}}`).join('\\n');
-            await send(`📅 *Agendamento*\\n\\nQual serviço você deseja realizar?\\n\\n${{servText}}\\n\\n_Digite o número correspondente ao serviço:_`);
+            // Checa primeiro se o usuário já tem agendamento
+            await send("⏳ Verificando seu cadastro...");
+            try {{
+                const res = await axios.post('https://app.vpgsolucoes.com.br/api/bot/check-agendamentos', {{
+                    whatsapp: userState[from].realPhone, estabelecimento_id: parseInt('{sessao}')
+                }});
+                
+                // Se o endpoint existir e retornar agendamentos, avisa o cliente.
+                if (res.data && res.data.agendamentos && res.data.agendamentos.length > 0) {{
+                    userState[from].flow = 'schedule_existing_action';
+                    let text = `Notamos que você já tem horário(s) agendado(s):\\n\\n`;
+                    res.data.agendamentos.forEach(a => {{
+                        text += `📅 *${{a.data}}* às *${{a.hora}}* - ${{a.servico || 'Serviço'}}\\n`;
+                    }});
+                    text += `\\nO que deseja fazer?\\n*1.* Marcar um NOVO horário\\n*2.* Voltar ao menu principal`;
+                    await send(text);
+                    return;
+                }}
+            }} catch(e) {{}} // Se a API não existir ainda, ignora e segue a vida
+            
+            await startSchedulingFlow(from);
             return;
         }}
 
@@ -501,7 +550,7 @@ client.on('message_create', async (msg) => {{
           await send(item.final_response || 'Obrigado pelo contato!');
           await send('_Digite *menu* para voltar ao início._');
           userState[from].active = false;
-          userState[from].cooldownUntil = Date.now() + 60000; // Trava de 1 min
+          userState[from].cooldownUntil = Date.now() + 60000; 
         }} else {{
           userState[from].path = targetLevel;
           userState[from].active = true; 

@@ -190,8 +190,17 @@
     </div>
     <div id="schedulingPanel" style="display:none; padding-top: 16px; margin-top: 16px; border-top: 1px solid var(--border);">
       <p style="font-size: 13px; color: var(--text-muted); margin-bottom: 16px; line-height: 1.5;">
-        O bot perguntará o <strong>Dia</strong> e a <strong>Hora</strong> diretamente no chat e enviará o agendamento direto para a sua agenda no painel.
+        O bot perguntará o <strong>Serviço, Dia e Hora</strong> diretamente no chat filtrando os horários vazios na hora e enviará para a sua agenda do painel.
       </p>
+      
+      <div class="d-flex align-items-center justify-content-between mb-3" style="background: var(--surface2); padding: 12px; border-radius: 8px; max-width: 400px;">
+        <span style="font-size: 13px; font-weight: 600;">Mostrar preço do serviço ao cliente</span>
+        <label class="switch" style="width: 36px; height: 18px;">
+            <input type="checkbox" id="toggleShowPrice" onchange="config.show_price_on_schedule = this.checked;">
+            <span class="slider round" style="border-radius: 18px;"></span>
+        </label>
+      </div>
+
       <div class="form-group" style="max-width: 300px;">
         <label>Disponibilizar agenda para quantos dias à frente?</label>
         <div style="display:flex; align-items:center; gap: 10px;">
@@ -204,7 +213,7 @@
 
   <div class="settings-section">
     <div class="section-header" style="margin-bottom: 0;">
-      <div class="section-title"><i class="fa-solid fa-tags"></i> Integração de Serviços / Produtos</div>
+      <div class="section-title"><i class="fa-solid fa-tags"></i> Botão Catálogo de Serviços/Produtos</div>
       <label class="switch">
         <input type="checkbox" id="toggleProducts" onchange="toggleProductsUI(this.checked)">
         <span class="slider round"></span>
@@ -212,11 +221,9 @@
     </div>
     <div id="productsPanel" style="display:none; padding-top: 16px; margin-top: 16px; border-top: 1px solid var(--border);">
       <p style="font-size: 13px; color: var(--text-muted); margin-bottom: 12px; line-height: 1.5;">
-        Adiciona a opção "Catálogo" no menu e também <strong>pergunta qual serviço o cliente deseja na hora de agendar</strong>.
+        Adiciona a opção "Catálogo" no menu para o cliente apenas conferir os valores sem precisar agendar.
       </p>
-      <div class="products-list">
-        <!-- Serviços serão renderizados aqui dinamicamente -->
-      </div>
+      <div class="products-list"></div>
     </div>
   </div>
 
@@ -238,7 +245,7 @@
 
 <div class="tab-content" id="tab-simulator">
   <div class="info-box" style="width: 100%; max-width: 420px; text-align: center;">
-    💡 <strong>Teste ao vivo!</strong> Se o Agendamento estiver ativado, faça o fluxo completo abaixo.
+    💡 <strong>Teste ao vivo!</strong> O simulador já usa os dados da sua agenda real.
   </div>
   
   <div class="sim-container">
@@ -299,9 +306,9 @@
 const urlParams = new URLSearchParams(window.location.search);
 const sessao = urlParams.get('sessao') || 'default';
 
-let config = { business_name: '', welcome_message: '', menu: [], show_products: false, enable_scheduling: false, scheduling_days_ahead: 7 };
+let config = { business_name: '', welcome_message: '', menu: [], show_products: false, enable_scheduling: false, scheduling_days_ahead: 7, show_price_on_schedule: true };
 let ws = null;
-let servicosCadastrados = []; // Array global para armazenar os serviços
+let servicosCadastrados = []; 
 
 function switchTab(name) {
   document.querySelectorAll('.tab-content').forEach(t => t.classList.remove('active'));
@@ -393,7 +400,6 @@ function updateBotStatus(status) {
 async function startBot() {
   document.getElementById('qrPlaceholder').style.display = 'none';
   document.getElementById('qrLoading').style.display = 'flex';
-  
   document.getElementById('btnStart').disabled = true;
   document.getElementById('btnStart').innerHTML = '<i class="fa-solid fa-spinner fa-spin"></i> Iniciando...';
 
@@ -412,35 +418,30 @@ async function startBot() {
       document.getElementById('btnStart').innerHTML = '<i class="fa-solid fa-play"></i> Iniciar Bot';
     }
   } catch (err) {
-    showToast('Erro ao ligar. O servidor não respondeu.', 'error');
+    showToast('Erro ao ligar.', 'error');
     document.getElementById('btnStart').disabled = false;
     document.getElementById('btnStart').innerHTML = '<i class="fa-solid fa-play"></i> Iniciar Bot';
   }
 }
 
 async function stopBot() { await fetch(`/bot-interno/api/bot/stop?sessao=${sessao}`, { method: 'POST' }); updateBotStatus('stopped'); }
-
 async function restartBot() {
   showToast('Reiniciando...', 'success');
   await fetch(`/bot-interno/api/bot/stop?sessao=${sessao}`, { method: 'POST' });
   setTimeout(() => startBot(), 1500);
 }
 
-// ── Configurações e Busca de Serviços Reais ───────────────────────────────
+// ── Configurações e Busca de Serviços ───────────────────────────────
 async function fetchServicos() {
     try {
         const res = await fetch(`https://app.vpgsolucoes.com.br/api/bot/servicos?estabelecimento_id=${sessao}`);
         const data = await res.json();
         if (data && data.servicos) {
-            // Guarda o objeto inteiro em vez de apenas a string
             servicosCadastrados = data.servicos;
         } else {
             servicosCadastrados = [];
         }
-    } catch(err) {
-        console.error("Erro ao buscar serviços:", err);
-        servicosCadastrados = [];
-    }
+    } catch(err) { servicosCadastrados = []; }
 }
 
 async function toggleProductsUI(isChecked) { 
@@ -452,16 +453,14 @@ async function toggleProductsUI(isChecked) {
         listDiv.innerHTML = '<span style="font-size:13px; color: var(--text-muted);">Sincronizando serviços... <i class="fa-solid fa-spinner fa-spin"></i></span>';
         
         await fetchServicos(); 
-        
         if (servicosCadastrados.length > 0) {
             listDiv.innerHTML = '';
             servicosCadastrados.forEach(servico => {
-                // Monta o visual certinho aqui
-                const valorFormatado = servico.valor.toFixed(2).replace('.', ',');
+                const valorFormatado = (servico.valor || 0).toFixed(2).replace('.', ',');
                 listDiv.innerHTML += `<div class="product-badge"><i class="fa-solid fa-check"></i> ${servico.nome} - R$ ${valorFormatado}</div>`;
             });
         } else {
-            listDiv.innerHTML = '<span style="font-size:13px; color: var(--warning);"><i class="fa-solid fa-triangle-exclamation"></i> Nenhum serviço cadastrado no painel principal.</span>';
+            listDiv.innerHTML = '<span style="font-size:13px; color: var(--warning);"><i class="fa-solid fa-triangle-exclamation"></i> Nenhum serviço cadastrado no painel.</span>';
         }
     }
 }
@@ -470,11 +469,13 @@ async function loadConfig() {
   const r = await fetch(`/bot-interno/api/config?sessao=${sessao}`);
   config = await r.json();
 
+  // Compatibilidade caso não exista a chave no JSON velho
+  if(config.show_price_on_schedule === undefined) config.show_price_on_schedule = true;
+
   document.getElementById('businessName').value = config.business_name || '';
   document.getElementById('welcomeMessage').value = config.welcome_message || '';
   updateBusinessName();
   
-  // Aguarda carregar os serviços da API oficial para usar na interface e simulador
   await fetchServicos();
   
   document.getElementById('toggleProducts').checked = config.show_products === true;
@@ -482,6 +483,7 @@ async function loadConfig() {
   
   document.getElementById('toggleScheduling').checked = config.enable_scheduling === true;
   document.getElementById('schedulingDays').value = config.scheduling_days_ahead || 7;
+  document.getElementById('toggleShowPrice').checked = config.show_price_on_schedule === true;
   toggleScheduleUI(config.enable_scheduling === true);
 
   renderMenuTree();
@@ -493,6 +495,7 @@ async function saveConfig() {
   config.show_products = document.getElementById('toggleProducts').checked;
   config.enable_scheduling = document.getElementById('toggleScheduling').checked;
   config.scheduling_days_ahead = parseInt(document.getElementById('schedulingDays').value) || 7;
+  // A variável show_price_on_schedule já é salva no onChange do toggle.
 
   await fetch(`/bot-interno/api/config?sessao=${sessao}`, { method: 'POST', headers: { 'Content-Type': 'application/json' }, body: JSON.stringify(config) });
   showToast('Salvo com sucesso!', 'success');
@@ -518,9 +521,7 @@ function renderMenuTree() {
 
 function createRootItem(item, index) {
   const div = document.createElement('div'); 
-  // Já deixamos a classe 'open' para ele não fechar sozinho se o render for chamado por outro motivo
   div.className = 'menu-item open'; 
-  
   div.innerHTML = `
     <div class="menu-item-header" onclick="toggleItem(this.parentElement)">
       <div class="item-number">${index + 1}</div>
@@ -543,16 +544,13 @@ function createRootItem(item, index) {
 
 function addRootItem() { config.menu.push({ id: generateId(), text: 'Nova Opção', final_response: '' }); renderMenuTree(); }
 
-// ── Simulador Dinâmico ────────────────────────────────────────────────────
+// ── Simulador Dinâmico Avançado ────────────────────────────────────────────────────
 let simState = { active: false, flow: 'menu', data: {} };
-const mockHorarios = ['09:00', '10:00', '14:00', '15:30', '17:00']; // Os horários continuam simulados no frontend
 
 function getNextDaysListSim() {
     let days = []; let curr = new Date(); const week = ['Dom','Seg','Ter','Qua','Qui','Sex','Sáb'];
-
     let dHoje = String(curr.getDate()).padStart(2, '0');
     let mHoje = String(curr.getMonth() + 1).padStart(2, '0');
-    
     days.push(`Hoje ${dHoje}/${mHoje}`);
     for(let i=1; i<=config.scheduling_days_ahead; i++) {
         curr.setDate(curr.getDate() + 1);
@@ -578,7 +576,7 @@ function getActiveSimMenu() {
     return active;
 }
 
-function handleSimulate() {
+async function handleSimulate() {
   const input = document.getElementById('simInput');
   const text = input.value.trim();
   if (!text) return;
@@ -587,7 +585,7 @@ function handleSimulate() {
   setTimeout(() => processSimMessage(text), 600);
 }
 
-function processSimMessage(body) {
+async function processSimMessage(body) {
   let textLower = body.toLowerCase();
   let activeMenu = getActiveSimMenu();
   const menuText = activeMenu.map((m, i) => `*${i+1}.* ${m.text}`).join('\n');
@@ -604,98 +602,118 @@ function processSimMessage(body) {
     return;
   }
 
-  // Máquina de Estados: Agendamento usando Serviços Reais
+  // --- MÁQUINA DE ESTADOS DO SIMULADOR ---
   if (simState.flow.startsWith('schedule_')) {
       const choice = parseInt(body) - 1;
       
-      // Estado 1: Simulador escolhe Serviço
+      if (simState.flow === 'schedule_existing_action') {
+          if (body === '1') {
+              simularFlowService();
+          } else {
+              simState.active = false;
+              addSimMessage('Retornando ao menu principal.\n_Digite *menu* para ver as opções._', 'bot');
+          }
+          return;
+      }
+      
       if (simState.flow === 'schedule_service') {
           if (isNaN(choice) || choice < 0 || choice >= servicosCadastrados.length) {
-              addSimMessage('❌ Serviço inválido. Escolha um número.', 'bot'); return;
+              addSimMessage('❌ Serviço inválido.', 'bot'); return;
           }
           const serv = servicosCadastrados[choice];
           simState.data.service = serv.nome;
           simState.data.serviceId = serv.id;
           
-          simState.flow = 'schedule_day';
-          const days = getNextDaysListSim();
-          let daysText = days.map((d, i) => `*${i+1}.* ${d}`).join('\n');
-          addSimMessage(`Você escolheu *${serv.nome}*.\n\nPara qual dia você deseja agendar?\n\n${daysText}\n\n_Digite o número do dia:_`, 'bot');
-          return;
-      }
-
-      // Estado 2: Simulador escolhe Dia
-      if (simState.flow === 'schedule_day') {
-          const days = getNextDaysListSim();
-          if (isNaN(choice) || choice < 0 || choice >= days.length) {
-              addSimMessage('❌ Opção inválida. Escolha um número.', 'bot'); return;
-          }
-          simState.data.day = days[choice];
+          addSimMessage('⏳ Simulando busca de dias disponíveis na API...', 'bot');
+          const daysToCheck = getNextDaysListSim();
+          const availableDays = [];
           
-          // No simulador, vamos fazer o fetch real para a API também!
-          fetch('https://app.vpgsolucoes.com.br/api/bot/horarios-livres', {
-                method: 'POST',
-                headers: {'Content-Type': 'application/json'},
-                body: JSON.stringify({ 
-                    estabelecimento_id: sessao,
-                    servico_id: simState.data.serviceId,
-                    data: simState.data.day
-                })
-          }).then(r => r.json()).then(data => {
-              if(!data.horarios || data.horarios.length === 0) {
-                  addSimMessage(`Não temos horários para *${simState.data.day}* com tempo suficiente.\nDigite *menu* para voltar.`, 'bot');
-                  simState.active = false; return;
-              }
-              simState.horariosDisponiveis = data.horarios;
-              simState.flow = 'schedule_time';
-              let timeText = data.horarios.map((h, i) => `*${i+1}.* ${h}`).join('\n');
-              addSimMessage(`Horários livres para *${simState.data.day}*:\n\n${timeText}\n\n_Digite o número do horário:_`, 'bot');
-          });
+          // Imita a busca do Bot real
+          for (let dayStr of daysToCheck) {
+              try {
+                  const res = await fetch('https://app.vpgsolucoes.com.br/api/bot/horarios-livres', {
+                        method: 'POST', headers: {'Content-Type': 'application/json'},
+                        body: JSON.stringify({ estabelecimento_id: sessao, servico_id: simState.data.serviceId, data: dayStr })
+                  });
+                  const data = await res.json();
+                  if(data.horarios && data.horarios.length > 0) availableDays.push({ day: dayStr, horarios: data.horarios });
+              } catch(e) {}
+          }
+
+          if (availableDays.length === 0) {
+              addSimMessage(`Não temos nenhum dia com horários livres para esse serviço.\nDigite *menu* e tente amanhã.`, 'bot');
+              simState.active = false; return;
+          }
+
+          simState.availableDaysData = availableDays;
+          simState.flow = 'schedule_day';
+          
+          let daysText = availableDays.map((d, i) => `*${i+1}.* ${d.day} (${d.horarios.length} vagas)`).join('\n');
+          addSimMessage(`Você escolheu *${serv.nome}*.\n\nTemos vagas abertas nestes dias:\n\n${daysText}\n\n_Digite o número do dia:_`, 'bot');
           return;
       }
 
-      // Estado 3: Simulador escolhe Hora
+      if (simState.flow === 'schedule_day') {
+          const availableDays = simState.availableDaysData;
+          if (isNaN(choice) || choice < 0 || choice >= availableDays.length) {
+              addSimMessage('❌ Opção inválida.', 'bot'); return;
+          }
+          
+          const selected = availableDays[choice];
+          simState.data.day = selected.day;
+          simState.horariosDisponiveis = selected.horarios;
+          simState.flow = 'schedule_time';
+          
+          let timeText = selected.horarios.map((h, i) => `*${i+1}.* ${h}`).join('\n');
+          addSimMessage(`Ótimo! Estes são os horários livres para *${selected.day}*:\n\n${timeText}\n\n_Digite o número do horário:_`, 'bot');
+          return;
+      }
+
       if (simState.flow === 'schedule_time') {
           const horarios = simState.horariosDisponiveis;
           if (isNaN(choice) || choice < 0 || choice >= horarios.length) {
               addSimMessage('❌ Horário inválido.', 'bot'); return;
           }
           simState.data.time = horarios[choice];
-          finalizarSimulacao(); return;
+          let resumo = `✅ *AGENDAMENTO CONFIRMADO!*\n\n✂️ Serviço: *${simState.data.service}*\n📅 Data: *${simState.data.day}*\n⏰ Horário: *${simState.data.time}*\n\n_Digite *menu* para voltar._`;
+          addSimMessage(resumo, 'bot');
+          simState.active = false;
+          return;
       }
   }
-
-  function finalizarSimulacao() {
-      let resumo = `✅ *AGENDAMENTO CONFIRMADO!*\n\n✂️ Serviço: *${simState.data.service}*\n📅 Data: *${simState.data.day}*\n⏰ Horário: *${simState.data.time}*`;
-      resumo += `\n\nJá anotei na agenda oficial. Te esperamos!\n\n_Digite *menu* para voltar ao início._`;
-      addSimMessage(resumo, 'bot');
-      simState.active = false;
-  }
     
+  function simularFlowService() {
+      simState.flow = 'schedule_service';
+      if (servicosCadastrados.length === 0) {
+          addSimMessage('❌ Sem serviços para agendar.', 'bot');
+          simState.active = false; return;
+      }
+      let servText = servicosCadastrados.map((s, i) => {
+          let p = config.show_price_on_schedule ? ` - R$ ${(s.valor || 0).toFixed(2).replace('.', ',')}` : '';
+          return `*${i+1}.* ${s.nome}${p}`;
+      }).join('\n');
+      addSimMessage(`📅 *Agendamento*\n\nQual serviço você deseja realizar?\n\n${servText}\n\n_Digite o número correspondente:_`, 'bot');
+  }
 
-  // Fluxo Menu Normal
+  // --- MENU PRINCIPAL ---
   if (simState.flow === 'menu') {
       const choice = parseInt(body) - 1;
       if (isNaN(choice) || choice < 0 || choice >= activeMenu.length) {
-        addSimMessage('❌ Opção inválida. Digite o número correspondente.', 'bot'); return;
+        addSimMessage('❌ Opção inválida.', 'bot'); return;
       }
 
       let item = activeMenu[choice];
 
       if (item.is_catalogo) {
-          let servText = servicosCadastrados.map(s => `✔️ ${s}`).join('\n');
+          let servText = servicosCadastrados.map(s => `✔️ ${s.nome} - R$ ${(s.valor || 0).toFixed(2).replace('.', ',')}`).join('\n');
           addSimMessage(`📋 *Nosso Catálogo*\n\n${servText}\n\n_Digite *menu* para voltar._`, 'bot');
           simState.active = false; return;
       }
       
       if (item.is_agendamento) {
-          if (servicosCadastrados.length === 0) {
-              addSimMessage('❌ Sem serviços para agendar.', 'bot');
-              simState.active = false; return;
-          }
-          simState.flow = 'schedule_service';
-          let servText = servicosCadastrados.map((s, i) => `*${i+1}.* ${s.nome} - R$ ${s.valor.toFixed(2).replace('.', ',')}`).join('\n');
-          addSimMessage(`📅 *Agendamento*\n\nQual serviço você deseja realizar?\n\n${servText}\n\n_Digite o número:_`, 'bot');
+          addSimMessage("⏳ Verificando seu cadastro... (Simulação)", 'bot');
+          // No simulador a gente assume que é a primeira vez. Mas você pode mudar a flag no painel se quiser.
+          simularFlowService();
           return;
       }
 
@@ -705,7 +723,6 @@ function processSimMessage(body) {
   }
 }
 
-// ── Start ─────────────────────────────────────────────────────────────────
 connectWS(); loadConfig();
 fetch(`/bot-interno/api/bot/status?sessao=${sessao}`).then(r=>r.json()).then(d=> updateBotStatus(d.status));
 </script>
