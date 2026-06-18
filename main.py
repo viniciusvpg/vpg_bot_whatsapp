@@ -272,6 +272,10 @@ client.on('message_create', async (msg) => {{
         if (rawNum.startsWith('55') && (rawNum.length === 13 || rawNum.length === 12)) {{
             rawNum = rawNum.substring(2);
         }}
+
+        if (rawNum.length === 10) {{
+            rawNum = rawNum.substring(0, 2) + '9' + rawNum.substring(2);
+        }}
         userState[from].realPhone = rawNum;
     }}
 
