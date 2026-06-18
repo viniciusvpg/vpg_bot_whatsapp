@@ -127,7 +127,7 @@ async def start_bot(sessao: str = "default"):
 
 @app.post("/api/bot/stop")
 async def stop_bot(sessao: str = "default"):
-    if sessao in BOT_PROCESSES and BOT_PROCESSES[sessao]:
+    if sessao in BOTPROCESSES and BOT_PROCESSES[sessao]:
         BOT_PROCESSES[sessao].terminate()
         del BOT_PROCESSES[sessao]
         BOT_STATES[sessao] = "stopped"
@@ -291,7 +291,7 @@ client.on('message_create', async (msg) => {{
     try {{ chat = await msg.getChat(); }} catch (e) {{}}
     
     // ==============================================================
-    // 4. FUNÇÃO CENTRAL DE ENVIO - COM DELAY E RASTREADOR
+    // 4. FUNÇÃO CENTRAL DE ENVIO
     // ==============================================================
     const send = async (text) => {{
         try {{ if (chat) await chat.sendStateTyping(); }} catch(e) {{}}
@@ -309,7 +309,7 @@ client.on('message_create', async (msg) => {{
     }};
 
     // ==============================================================
-    // 5. ENTRADA PRINCIPAL / RESET DO MENU (FIM DO BUG DO MENU DUPLO)
+    // 5. ENTRADA PRINCIPAL / RESET DO MENU
     // ==============================================================
     const isGreeting = ['menu', 'oi', 'olá', 'ola', 'bom dia', 'boa tarde', 'boa noite', '0'].includes(textLower);
 
@@ -326,7 +326,7 @@ client.on('message_create', async (msg) => {{
     }}
 
     // ==========================================================
-    // INICIAR A LISTA DE SERVIÇOS (REUTILIZÁVEL)
+    // INICIAR A LISTA DE SERVIÇOS 
     // ==========================================================
     async function startSchedulingFlow(userFrom) {{
         userState[userFrom].flow = 'schedule_service';
@@ -351,10 +351,20 @@ client.on('message_create', async (msg) => {{
         // --- ETAPA: AÇÃO AGENDAMENTO EXISTENTE ---
         if (userState[from].flow === 'schedule_existing_action') {{
             if (body === '1') {{
+                // Mostrar os agendamentos salvos na memória
+                let text = `📋 *Seus agendamentos em aberto:*\\n\\n`;
+                if(userState[from].existing_appointments) {{
+                    userState[from].existing_appointments.forEach(a => {{
+                        text += `📅 *${{a.data}}* às *${{a.hora}}* - ${{a.servico || 'Serviço'}}\\n`;
+                    }});
+                }}
+                text += `\\n_Digite *menu* para voltar._`;
+                await send(text);
+                userState[from].active = false;
+            }} else if (body === '2') {{
                 await startSchedulingFlow(from);
             }} else {{
-                await send("Tudo bem! Retornando ao menu principal.\\n_Digite *menu* para ver as opções._");
-                userState[from].active = false;
+                await send("❌ Opção inválida.\\nDigite *1* para Consultar, *2* para Novo Agendamento ou *menu* para voltar.");
             }}
             return;
         }}
@@ -508,23 +518,27 @@ client.on('message_create', async (msg) => {{
         }}
 
         if (item.is_agendamento) {{
+            await send("⏳ Verificando seu cadastro...");
             try {{
                 const res = await axios.post('https://app.vpgsolucoes.com.br/api/bot/check-agendamentos', {{
                     whatsapp: userState[from].realPhone, estabelecimento_id: parseInt('{sessao}')
                 }});
                 
+                // Se a API devolver agendamentos, criamos o Sub-Menu!
                 if (res.data && res.data.agendamentos && res.data.agendamentos.length > 0) {{
+                    userState[from].existing_appointments = res.data.agendamentos;
                     userState[from].flow = 'schedule_existing_action';
-                    let text = `Notamos que você já tem horário(s) agendado(s):\\n\\n`;
-                    res.data.agendamentos.forEach(a => {{
-                        text += `📅 *${{a.data}}* às *${{a.hora}}* - ${{a.servico || 'Serviço'}}\\n`;
-                    }});
-                    text += `\\nO que deseja fazer?\\n*1.* Marcar um NOVO horário\\n*2.* Voltar ao menu principal`;
+                    
+                    let text = `Notei que já consta um agendamento em aberto no sistema.\\n\\nO que deseja fazer?\\n*1.* Consultar meu agendamento\\n*2.* Novo Agendamento\\n\\n_Digite *menu* para voltar._`;
                     await send(text);
                     return;
                 }}
-            }} catch(e) {{}}
+            }} catch(e) {{
+                // Esse Log vai te mostrar no terminal se a rota deu erro 500 ou 404
+                console.log("Erro ao checar agendamentos:", e.message);
+            }}
             
+            // Se não tem agendamento ou se a API deu erro, vai direto pra marcar novo
             await startSchedulingFlow(from);
             return;
         }}
