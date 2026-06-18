@@ -412,7 +412,7 @@ client.on('message_create', async (msg) => {{
             userState[from].flow = 'schedule_day';
             
             let daysText = availableDays.map((d, i) => `*${{i+1}}.* ${{d.day}}`).join('\\n');
-            await send(`Você escolheu *${{servicoObj.nome}}*.\\n\\nTemos vagas abertas nestes dias:\\n\\n${{daysText}}\\n\\n_Digite o número correspondente ao dia:_`);
+            await send(`Você escolheu *${{servicoObj.nome}}*.\\n\\nTemos vagas disponíveis nestes dias:\\n\\n${{daysText}}\\n\\n_Digite o número correspondente ao dia:_`);
             return;
         }}
 
