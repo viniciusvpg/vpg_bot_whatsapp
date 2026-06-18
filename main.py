@@ -522,24 +522,16 @@ client.on('message_create', async (msg) => {{
         }}
 
         if (item.is_agendamento) {{
-            try {{
-                // ==========================================
-                // DEBUG VISUAL DIRETO NO CHAT
-                // ==========================================
-                await send(`🛠️ *DEBUG: INICIANDO BUSCA* 🛠️\\nProcurando cliente: ${{userState[from].realPhone}}`);
-                
+            try {{              
                 const res = await axios.post('https://app.vpgsolucoes.com.br/api/bot/check-agendamentos', {{
                     whatsapp: userState[from].realPhone, estabelecimento_id: parseInt('{sessao}')
                 }});
-                
-                await send(`🛠️ *DEBUG: RETORNO DA API* 🛠️\\n${{JSON.stringify(res.data)}}`);
-                // ==========================================
                 
                 if (res.data && res.data.agendamentos && res.data.agendamentos.length > 0) {{
                     userState[from].existing_appointments = res.data.agendamentos;
                     userState[from].flow = 'schedule_existing_action';
                     
-                    let text = `Notei que já consta um agendamento em aberto no sistema.\\n\\nO que deseja fazer?\\n*1.* Consultar meu agendamento\\n*2.* Novo Agendamento\\n\\n_Digite *menu* para voltar._`;
+                    let text = `Notei que já consta um agendamento em aberto no sistema.\\n\\n*1.* Consultar meu agendamento\\n*2.* Novo Agendamento\\n\\n_Digite *menu* para voltar._`;
                     await send(text);
                     return;
                 }}
