@@ -16,7 +16,6 @@
   * { box-sizing: border-box; margin: 0; padding: 0; }
   body { font-family: 'DM Sans', sans-serif; background: var(--bg); color: var(--text); min-height: 100vh; display: flex; flex-direction: column; }
 
-  /* Header & Tabs */
   header { background: var(--surface); border-bottom: 1px solid var(--border); padding: 0 24px; display: flex; align-items: center; justify-content: space-between; height: 64px; }
   .header-brand { display: flex; align-items: center; gap: 12px; }
   .header-brand .logo-icon { width: 36px; height: 36px; background: var(--green); border-radius: 10px; display: flex; align-items: center; justify-content: center; font-size: 20px; }
@@ -34,7 +33,6 @@
   .tab-content { display: none; flex: 1; }
   .tab-content.active { display: flex; }
 
-  /* Base Elements */
   .btn { padding: 11px 24px; border-radius: 10px; border: none; font-size: 14px; font-weight: 500; cursor: pointer; display: inline-flex; align-items: center; justify-content: center; gap: 8px; font-family: 'DM Sans', sans-serif; }
   .btn-primary { background: var(--green); color: #000; font-weight: 700; }
   .btn-primary:hover { background: #1ebe5a; }
@@ -42,7 +40,6 @@
   .btn-secondary { background: var(--surface2); color: var(--text); border: 1px solid var(--border); }
   .btn-secondary:hover { background: var(--border); }
 
-  /* Settings Area */
   #tab-settings { flex-direction: column; max-width: 900px; margin: 0 auto; width: 100%; padding: 32px 24px; gap: 24px; }
   .settings-section { background: var(--surface); border: 1px solid var(--border); border-radius: var(--radius); padding: 24px; }
   .section-header { display: flex; align-items: center; justify-content: space-between; margin-bottom: 20px; }
@@ -52,7 +49,6 @@
   input[type="text"], input[type="number"], textarea { width: 100%; background: var(--bg); border: 1px solid var(--border); border-radius: 8px; padding: 10px 14px; color: var(--text); font-family: 'DM Sans', sans-serif; font-size: 14px; outline: none; }
   input:focus, textarea:focus { border-color: var(--green); }
   
-  /* Toggles & Badges */
   .switch { position: relative; display: inline-block; width: 46px; height: 24px; }
   .switch input { opacity: 0; width: 0; height: 0; }
   .slider { position: absolute; cursor: pointer; top: 0; left: 0; right: 0; bottom: 0; background-color: var(--surface2); border: 1px solid var(--border); transition: .4s; border-radius: 24px; }
@@ -62,9 +58,7 @@
 
   .products-list, .schedule-preview { display: flex; flex-wrap: wrap; gap: 10px; margin-top: 12px; }
   .product-badge { background: rgba(37,211,102,0.1); border: 1px solid rgba(37,211,102,0.3); color: var(--green); padding: 6px 14px; border-radius: 20px; font-size: 13px; font-weight: 500; display: flex; align-items: center; gap: 6px; }
-  .schedule-badge { background: rgba(18,140,126,0.1); border: 1px solid rgba(18,140,126,0.3); color: var(--green-dark); padding: 6px 14px; border-radius: 8px; font-size: 13px; font-weight: 500; }
 
-  /* Connection Tab */
   #tab-connection { flex-direction: column; align-items: center; justify-content: center; padding: 40px 24px; gap: 32px; }
   .qr-panel { background: var(--surface); border: 1px solid var(--border); border-radius: 20px; padding: 32px; text-align: center; max-width: 420px; width: 100%; }
   .qr-box { width: 220px; height: 220px; margin: 0 auto 24px; background: white; border-radius: 16px; display: flex; align-items: center; justify-content: center; position: relative; }
@@ -72,7 +66,6 @@
   .qr-placeholder, .qr-connected { display: flex; flex-direction: column; align-items: center; gap: 12px; color: #aaa; font-size: 13px; }
   .check-circle { width: 64px; height: 64px; background: var(--green); border-radius: 50%; display: flex; align-items: center; justify-content: center; font-size: 32px; }
 
-  /* Menu Builder */
   .menu-item { background: var(--bg); border: 1px solid var(--border); border-radius: 10px; overflow: hidden; margin-bottom: 8px; }
   .menu-item-header { display: flex; align-items: center; gap: 10px; padding: 12px 16px; cursor: pointer; }
   .menu-item-header:hover { background: var(--surface2); }
@@ -83,7 +76,6 @@
   .add-root-btn { border: 2px dashed var(--border); border-radius: 10px; padding: 14px; text-align: center; cursor: pointer; color: var(--text-muted); font-size: 13px; display: flex; align-items: center; justify-content: center; gap: 8px; background: none; width: 100%; transition: 0.2s;}
   .add-root-btn:hover { border-color: var(--green); color: var(--green); }
   
-  /* Simulator */
   #tab-simulator { flex-direction: column; align-items: center; padding: 32px 24px; gap: 20px; }
   .sim-container { width: 100%; max-width: 420px; height: 600px; border: 1px solid var(--border); border-radius: 24px; background: #0b141a; display: flex; flex-direction: column; overflow: hidden; }
   .sim-header { background: var(--surface); padding: 16px; border-bottom: 1px solid var(--border); display: flex; align-items: center; gap: 12px; }
@@ -97,7 +89,6 @@
   .sim-input-area input { flex: 1; border-radius: 24px; background: var(--bg); border: 1px solid var(--border); padding: 12px 16px; color: white; outline: none; }
   .sim-input-area button { width: 44px; height: 44px; border-radius: 50%; background: var(--green); color: black; border: none; cursor: pointer; font-size: 18px; display: flex; align-items: center; justify-content: center; transition: 0.2s;}
 
-  /* Tab Sobre */
   #tab-about { flex-direction: column; max-width: 720px; margin: 0 auto; width: 100%; padding: 32px 24px; gap: 20px; }
   .about-header { background: linear-gradient(135deg, var(--green-dark), var(--green)); border-radius: var(--radius); padding: 32px; text-align: center; color: #000; }
   .about-header h2 { font-family: 'Syne', sans-serif; font-size: 20px; font-weight: 800; margin-bottom: 6px; }
@@ -109,7 +100,6 @@
   .about-row-label { color: var(--text-muted); width: 110px; flex-shrink: 0; font-size: 13px; }
   .about-row-value { color: var(--text); font-weight: 600; }
 
-  /* Utils */
   .toast { position: fixed; bottom: 24px; right: 24px; background: var(--surface); border: 1px solid var(--border); border-radius: 12px; padding: 14px 20px; display: flex; align-items: center; gap: 12px; font-size: 14px; font-weight: 500; z-index: 999; transform: translateY(100px); opacity: 0; transition: all 0.3s; }
   .toast.show { transform: translateY(0); opacity: 1; }
   .toast.success { border-color: rgba(37,211,102,0.4); }
@@ -193,11 +183,12 @@
         O bot perguntará o <strong>Serviço, Dia e Hora</strong> diretamente no chat filtrando os horários vazios na hora e enviará para a sua agenda do painel.
       </p>
       
+      <!-- O BOTÃO AQUI FOI CORRIGIDO (Removido os inline styles que estragavam o slider) -->
       <div class="d-flex align-items-center justify-content-between mb-3" style="background: var(--surface2); padding: 12px; border-radius: 8px; max-width: 400px;">
         <span style="font-size: 13px; font-weight: 600;">Mostrar preço do serviço ao cliente</span>
-        <label class="switch" style="width: 36px; height: 18px;">
+        <label class="switch">
             <input type="checkbox" id="toggleShowPrice" onchange="config.show_price_on_schedule = this.checked;">
-            <span class="slider round" style="border-radius: 18px;"></span>
+            <span class="slider round"></span>
         </label>
       </div>
 
@@ -331,7 +322,6 @@ function showToast(msg, type = 'success') {
   setTimeout(() => toast.classList.remove('show'), 3000);
 }
 
-// ── WebSocket & Controle do Bot ───────────────────────────────────────────
 function connectWS() {
   const proto = location.protocol === 'https:' ? 'wss' : 'ws';
   ws = new WebSocket(`${proto}://${location.host}/bot-interno/ws/${sessao}`);
@@ -431,7 +421,6 @@ async function restartBot() {
   setTimeout(() => startBot(), 1500);
 }
 
-// ── Configurações e Busca de Serviços ───────────────────────────────
 async function fetchServicos() {
     try {
         const res = await fetch(`https://app.vpgsolucoes.com.br/api/bot/servicos?estabelecimento_id=${sessao}`);
@@ -469,7 +458,6 @@ async function loadConfig() {
   const r = await fetch(`/bot-interno/api/config?sessao=${sessao}`);
   config = await r.json();
 
-  // Compatibilidade caso não exista a chave no JSON velho
   if(config.show_price_on_schedule === undefined) config.show_price_on_schedule = true;
 
   document.getElementById('businessName').value = config.business_name || '';
@@ -495,7 +483,6 @@ async function saveConfig() {
   config.show_products = document.getElementById('toggleProducts').checked;
   config.enable_scheduling = document.getElementById('toggleScheduling').checked;
   config.scheduling_days_ahead = parseInt(document.getElementById('schedulingDays').value) || 7;
-  // A variável show_price_on_schedule já é salva no onChange do toggle.
 
   await fetch(`/bot-interno/api/config?sessao=${sessao}`, { method: 'POST', headers: { 'Content-Type': 'application/json' }, body: JSON.stringify(config) });
   showToast('Salvo com sucesso!', 'success');
@@ -509,7 +496,6 @@ function updateBusinessName() {
 
 function toggleScheduleUI(isChecked) { document.getElementById('schedulingPanel').style.display = isChecked ? 'block' : 'none'; }
 
-// ── Menu Manual Builder ───────────────────────────────────────────────────
 function generateId() { return Date.now().toString(36); }
 function escapeHtml(str) { return (str || '').replace(/&/g,'&amp;').replace(/</g,'&lt;').replace(/>/g,'&gt;'); }
 function toggleItem(el) { el.classList.toggle('open'); }
@@ -544,7 +530,6 @@ function createRootItem(item, index) {
 
 function addRootItem() { config.menu.push({ id: generateId(), text: 'Nova Opção', final_response: '' }); renderMenuTree(); }
 
-// ── Simulador Dinâmico Avançado ────────────────────────────────────────────────────
 let simState = { active: false, flow: 'menu', data: {} };
 
 function getNextDaysListSim() {
@@ -590,19 +575,14 @@ async function processSimMessage(body) {
   let activeMenu = getActiveSimMenu();
   const menuText = activeMenu.map((m, i) => `*${i+1}.* ${m.text}`).join('\n');
 
-  if (textLower === 'menu' || textLower === 'oi' || body === '0') {
+  const isGreeting = ['menu', 'oi', 'olá', 'ola', 'bom dia', 'boa tarde', 'boa noite', '0'].includes(textLower);
+
+  if (!simState.active || isGreeting) {
     simState = { active: true, flow: 'menu', data: {} };
     addSimMessage(`${config.welcome_message}\n\n${menuText}\n\n_Digite o número da opção desejada._`, 'bot');
     return;
   }
 
-  if (!simState.active) {
-    simState = { active: true, flow: 'menu', data: {} };
-    addSimMessage(`${config.welcome_message}\n\n${menuText}\n\n_Como posso ajudar? Digite uma opção:_`, 'bot');
-    return;
-  }
-
-  // --- MÁQUINA DE ESTADOS DO SIMULADOR ---
   if (simState.flow.startsWith('schedule_')) {
       const choice = parseInt(body) - 1;
       
@@ -624,11 +604,9 @@ async function processSimMessage(body) {
           simState.data.service = serv.nome;
           simState.data.serviceId = serv.id;
           
-          addSimMessage('⏳ Simulando busca de dias disponíveis na API...', 'bot');
           const daysToCheck = getNextDaysListSim();
           const availableDays = [];
           
-          // Imita a busca do Bot real
           for (let dayStr of daysToCheck) {
               try {
                   const res = await fetch('https://app.vpgsolucoes.com.br/api/bot/horarios-livres', {
@@ -648,7 +626,7 @@ async function processSimMessage(body) {
           simState.availableDaysData = availableDays;
           simState.flow = 'schedule_day';
           
-          let daysText = availableDays.map((d, i) => `*${i+1}.* ${d.day} (${d.horarios.length} vagas)`).join('\n');
+          let daysText = availableDays.map((d, i) => `*${i+1}.* ${d.day}`).join('\n');
           addSimMessage(`Você escolheu *${serv.nome}*.\n\nTemos vagas abertas nestes dias:\n\n${daysText}\n\n_Digite o número do dia:_`, 'bot');
           return;
       }
@@ -675,7 +653,7 @@ async function processSimMessage(body) {
               addSimMessage('❌ Horário inválido.', 'bot'); return;
           }
           simState.data.time = horarios[choice];
-          let resumo = `✅ *AGENDAMENTO CONFIRMADO!*\n\n✂️ Serviço: *${simState.data.service}*\n📅 Data: *${simState.data.day}*\n⏰ Horário: *${simState.data.time}*\n\n_Digite *menu* para voltar._`;
+          let resumo = `✅ *AGENDAMENTO CONFIRMADO!*\n\n📌 Serviço: *${simState.data.service}*\n📅 Data: *${simState.data.day}*\n⏰ Horário: *${simState.data.time}*\n\n_Digite *menu* para voltar._`;
           addSimMessage(resumo, 'bot');
           simState.active = false;
           return;
@@ -695,7 +673,6 @@ async function processSimMessage(body) {
       addSimMessage(`📅 *Agendamento*\n\nQual serviço você deseja realizar?\n\n${servText}\n\n_Digite o número correspondente:_`, 'bot');
   }
 
-  // --- MENU PRINCIPAL ---
   if (simState.flow === 'menu') {
       const choice = parseInt(body) - 1;
       if (isNaN(choice) || choice < 0 || choice >= activeMenu.length) {
@@ -711,8 +688,7 @@ async function processSimMessage(body) {
       }
       
       if (item.is_agendamento) {
-          addSimMessage("⏳ Verificando seu cadastro... (Simulação)", 'bot');
-          // No simulador a gente assume que é a primeira vez. Mas você pode mudar a flag no painel se quiser.
+          // No simulador, se quiser simular que tem horário, comente a linha abaixo e chame sua API.
           simularFlowService();
           return;
       }

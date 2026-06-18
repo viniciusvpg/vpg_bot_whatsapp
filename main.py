@@ -168,7 +168,6 @@ const enableScheduling = {enable_scheduling};
 const showPriceOnSchedule = {show_price};
 const daysAhead = {days_ahead};
 
-// Controle de Delay e Rastreio de Mensagens do Robô
 const delay = ms => new Promise(res => setTimeout(res, ms));
 const botMessages = {{}}; 
 let servicosCadastrados = [];
@@ -242,7 +241,6 @@ client.on('message_create', async (msg) => {{
     const body = msg.body ? msg.body.trim() : "";
     const textLower = body.toLowerCase();
     
-    // Identificador para saber se a msg é nossa ou do cliente
     const chatId = msg.fromMe ? msg.to : msg.from;
 
     if (chatId === 'status@broadcast' || chatId.includes('@newsletter')) return;
@@ -266,18 +264,14 @@ client.on('message_create', async (msg) => {{
     // ==============================================================
     if (!userState[from].realPhone) {{
         let rawNum = from.split('@')[0]; 
-        
         try {{
             const contact = await msg.getContact();
-            if (contact && contact.id && contact.id.user) {{
-                rawNum = contact.id.user; 
-            }}
+            if (contact && contact.id && contact.id.user) {{ rawNum = contact.id.user; }}
         }} catch (e) {{}}
 
         if (rawNum.startsWith('55') && (rawNum.length === 13 || rawNum.length === 12)) {{
             rawNum = rawNum.substring(2);
         }}
-        
         userState[from].realPhone = rawNum;
     }}
 
@@ -314,8 +308,12 @@ client.on('message_create', async (msg) => {{
         }}
     }};
 
-    // RESET FORÇADO
-    if (textLower === 'menu' || textLower === 'oi' || textLower === 'olá' || textLower === 'ola' || body === '0') {{
+    // ==============================================================
+    // 5. ENTRADA PRINCIPAL / RESET DO MENU (FIM DO BUG DO MENU DUPLO)
+    // ==============================================================
+    const isGreeting = ['menu', 'oi', 'olá', 'ola', 'bom dia', 'boa tarde', 'boa noite', '0'].includes(textLower);
+
+    if (!userState[from].active || isGreeting) {{
       userState[from].active = true;
       userState[from].lastOwnerMessage = 0; 
       userState[from].cooldownUntil = 0;    
@@ -327,17 +325,8 @@ client.on('message_create', async (msg) => {{
       return;
     }}
 
-    if (!userState[from].active) {{
-      userState[from].active = true;
-      userState[from].path = [];
-      userState[from].flow = 'menu';
-      if(showProducts) await fetchServicos();
-      await send(`{welcome}\\n\\n${{buildMenuText(getActiveMenu())}}\\n\\n_Como posso ajudar? Digite uma opção:_`);
-      return;
-    }}
-
     // ==========================================================
-    // FUNÇÃO PARA INICIAR A LISTA DE SERVIÇOS (REUTILIZÁVEL)
+    // INICIAR A LISTA DE SERVIÇOS (REUTILIZÁVEL)
     // ==========================================================
     async function startSchedulingFlow(userFrom) {{
         userState[userFrom].flow = 'schedule_service';
@@ -359,7 +348,7 @@ client.on('message_create', async (msg) => {{
     if (userState[from].flow.startsWith('schedule_')) {{
         const choice = parseInt(body) - 1;
         
-        // --- ETAPA: VERIFICAÇÃO DE AGENDAMENTO EXISTENTE ---
+        // --- ETAPA: AÇÃO AGENDAMENTO EXISTENTE ---
         if (userState[from].flow === 'schedule_existing_action') {{
             if (body === '1') {{
                 await startSchedulingFlow(from);
@@ -384,7 +373,6 @@ client.on('message_create', async (msg) => {{
             const daysToCheck = getNextDaysList();
             const availableDays = [];
             
-            // Busca simultânea de todos os dias
             const checks = daysToCheck.map(async (dayStr) => {{
                 try {{
                     const res = await axios.post('https://app.vpgsolucoes.com.br/api/bot/horarios-livres', {{
@@ -409,7 +397,7 @@ client.on('message_create', async (msg) => {{
             userState[from].availableDaysData = availableDays;
             userState[from].flow = 'schedule_day';
             
-            let daysText = availableDays.map((d, i) => `*${{i+1}}.* ${{d.day}} (${{d.horarios.length}} vagas)`).join('\\n');
+            let daysText = availableDays.map((d, i) => `*${{i+1}}.* ${{d.day}}`).join('\\n');
             await send(`Você escolheu *${{servicoObj.nome}}*.\\n\\nTemos vagas abertas nestes dias:\\n\\n${{daysText}}\\n\\n_Digite o número correspondente ao dia:_`);
             return;
         }}
@@ -451,9 +439,7 @@ client.on('message_create', async (msg) => {{
     }}
 
     async function checkCadastro(userFrom, sendFunc) {{
-        await sendFunc("⏳ Só um momento, estou preparando sua reserva...");
         const clientPhone = userState[userFrom].realPhone;
-        
         try {{
             const res = await axios.post('https://app.vpgsolucoes.com.br/api/bot/check-cliente', {{ 
                 whatsapp: clientPhone, estabelecimento_id: parseInt('{sessao}') 
@@ -477,7 +463,7 @@ client.on('message_create', async (msg) => {{
         const clientPhone = s.realPhone;
         let nomeFinal = s.nome || 'Não informado';
         
-        let resumo = `✅ *AGENDAMENTO CONFIRMADO!*\\n\\n👤 Cliente: *${{nomeFinal}}*\\n✂️ Serviço: *${{s.selectedService}}*\\n📅 Data: *${{s.selectedDay}}*\\n⏰ Horário: *${{s.selectedTime}}*`;
+        let resumo = `✅ *AGENDAMENTO CONFIRMADO!*\\n\\n👤 Cliente: *${{nomeFinal}}*\\n📌 Serviço: *${{s.selectedService}}*\\n📅 Data: *${{s.selectedDay}}*\\n⏰ Horário: *${{s.selectedTime}}*`;
         resumo += `\\n\\nJá anotei na agenda oficial. Te esperamos!\\n\\n_Digite *menu* para voltar ao início._`;
         
         await sendFunc(resumo);
@@ -522,14 +508,11 @@ client.on('message_create', async (msg) => {{
         }}
 
         if (item.is_agendamento) {{
-            // Checa primeiro se o usuário já tem agendamento
-            await send("⏳ Verificando seu cadastro...");
             try {{
                 const res = await axios.post('https://app.vpgsolucoes.com.br/api/bot/check-agendamentos', {{
                     whatsapp: userState[from].realPhone, estabelecimento_id: parseInt('{sessao}')
                 }});
                 
-                // Se o endpoint existir e retornar agendamentos, avisa o cliente.
                 if (res.data && res.data.agendamentos && res.data.agendamentos.length > 0) {{
                     userState[from].flow = 'schedule_existing_action';
                     let text = `Notamos que você já tem horário(s) agendado(s):\\n\\n`;
@@ -540,7 +523,7 @@ client.on('message_create', async (msg) => {{
                     await send(text);
                     return;
                 }}
-            }} catch(e) {{}} // Se a API não existir ainda, ignora e segue a vida
+            }} catch(e) {{}}
             
             await startSchedulingFlow(from);
             return;
